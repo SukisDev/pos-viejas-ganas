@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/* ================================ */
+/* Enums                            */
+/* ================================ */
+
+enum Role {
+  ADMIN
+  CASHIER
+  CHEF
+}
+
+enum BeeperStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+}
+
+/* ================================ */
+/* Usuarios                         */
+/* ================================ */
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String?
+  passwordHash String?
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+/* ================================ */
+/* Beepers                          */
+/* ================================ */
+
+model Beeper {
+  id        Int           @id
+  status    BeeperStatus  @default(AVAILABLE)
+  updatedAt DateTime      @default(now()) @updatedAt
+}
+
+/* ================================ */
+/* Correlativo diario               */
+/* ================================ */
+
+model DailyCounter {
+  businessDate DateTime @id                  // clave: el día (UTC o tu TZ)
+  lastValue    Int      @default(0)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/* ================================ */
+/* Productos                        */
+/* ================================ */
+
+model Product {
+  id         String   @id @default(cuid())
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  category   String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+}

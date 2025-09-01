@@ -1,103 +1,101 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import LogoutButton from '../components/LogoutButton';
+
+type Role = 'ADMIN' | 'CASHIER' | 'CHEF';
+
+interface Me {
+  id: string;
+  username: string;
+  role: Role;
+}
+
+export default function HomePage() {
+  const [me, setMe] = useState<Me | null>(null);
+
+  useEffect(() => {
+    let abort = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (!abort && res.ok) {
+          const data = (await res.json()) as Me;
+          setMe(data);
+        }
+      } catch {
+        /* ignorar */
+      }
+    })();
+    return () => {
+      abort = true;
+    };
+  }, []);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="min-h-[100svh] flex items-center justify-center bg-[#1D263B] text-white px-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white/5 backdrop-blur p-6 shadow-xl space-y-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">
+            Viejas Ganas POS <span className="text-[#8DFF50]">/</span> Bienvenido
+          </h1>
+          {me && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-white/70">{me.username}</span>
+              <LogoutButton />
+            </div>
+          )}
+        </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        {!me ? (
+          <section className="space-y-4">
+            <p className="text-white/80">Inicia sesión para acceder a tu área de trabajo.</p>
+            <Link
+              href="/login"
+              className="inline-block rounded-lg bg-[#8DFF50] px-4 py-2 font-semibold text-[#1D263B]"
+            >
+              Iniciar sesión
+            </Link>
+          </section>
+        ) : (
+          <section className="space-y-4">
+            <p>
+              Hola <span className="font-semibold text-[#8DFF50]">{me.username}</span> — Rol:{' '}
+              <span className="font-semibold">{me.role}</span>
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(me.role === 'ADMIN' || me.role === 'CASHIER') && (
+                <Link
+                  href="/cashier"
+                  className="rounded-lg bg-white/10 px-4 py-3 hover:bg-white/15"
+                >
+                  Ir a Caja
+                </Link>
+              )}
+
+              {(me.role === 'ADMIN' || me.role === 'CHEF') && (
+                <Link
+                  href="/kitchen"
+                  className="rounded-lg bg-white/10 px-4 py-3 hover:bg-white/15"
+                >
+                  Ir a Cocina
+                </Link>
+              )}
+
+              {me.role === 'ADMIN' && (
+                <Link
+                  href="/admin"
+                  className="rounded-lg bg-white/10 px-4 py-3 hover:bg-white/15"
+                >
+                  Ir a Admin
+                </Link>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+    </main>
   );
 }
