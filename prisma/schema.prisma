@@ -24,6 +24,13 @@ enum BeeperStatus {
   MAINTENANCE
 }
 
+enum OrderStatus {
+  IN_KITCHEN
+  READY
+  DELIVERED
+  CANCELLED
+}
+
 /* ================================ */
 /* Usuarios                         */
 /* ================================ */
@@ -37,6 +44,10 @@ model User {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
+
+  // Relaciones para pedidos
+  ordersCreated   Order[] @relation("CashierOrders")
+  ordersCompleted Order[] @relation("ChefOrders")
 }
 
 /* ================================ */
@@ -47,6 +58,9 @@ model Beeper {
   id        Int           @id
   status    BeeperStatus  @default(AVAILABLE)
   updatedAt DateTime      @default(now()) @updatedAt
+
+  // Relación con pedidos
+  orders Order[]
 }
 
 /* ================================ */
@@ -73,4 +87,88 @@ model Product {
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
+
+  // Relación con items de pedido
+  orderItems OrderItem[]
+}
+
+/* ================================ */
+/* Pedidos                          */
+/* ================================ */
+
+model Order {
+  id           String      @id @default(cuid())
+  number       Int         // correlativo del día
+  businessDate DateTime    @db.Date
+  status       OrderStatus @default(IN_KITCHEN)
+  total        Decimal     @db.Decimal(10, 2)
+  deliveredAt  DateTime?
+  notes        String?     // descripción del pedido
+
+  // Foreign Keys
+  beeperId  Int
+  cashierId String
+  chefId    String?
+
+  // Relaciones
+  beeper   Beeper      @relation(fields: [beeperId], references: [id])
+  cashier  User        @relation("CashierOrders", fields: [cashierId], references: [id])
+  chef     User?       @relation("ChefOrders", fields: [chefId], references: [id])
+  items    OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessDate, number])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  qty       Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  lineTotal Decimal @db.Decimal(10, 2)
+  notes     String? // descripción específica del item
+
+  // Foreign Keys
+  orderId   String
+  productId String?  // null para productos custom
+
+  // Para productos custom (no están en catálogo)
+  customName String?
+
+  // Relaciones
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+/* ================================ */
+/* Sistema de créditos              */
+/* ================================ */
+
+model CreditCustomer {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relación con transacciones
+  transactions CreditTransaction[]
+}
+
+model CreditTransaction {
+  id           String   @id @default(cuid())
+  amount       Decimal  @db.Decimal(10, 2)
+  description  String?
+  businessDate DateTime @db.Date
+
+  // Foreign Key
+  customerId String
+
+  // Relación
+  customer CreditCustomer @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([businessDate])
 }

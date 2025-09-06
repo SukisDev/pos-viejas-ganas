@@ -25,6 +25,10 @@ async function main() {
   await ensureUser('caja', 'caja123', 'CASHIER');
   await ensureUser('chef', 'chef123', 'CHEF');
 
+  // Limpiar en orden correcto (foreign keys)
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.dailyCounter.deleteMany();
   await prisma.beeper.deleteMany();
   await prisma.product.deleteMany();
 

@@ -26,8 +26,20 @@ type CartItem = {
   category?: string;
 };
 
+type ReadyOrder = {
+  id: string;
+  number: number;
+  beeperId: number;
+  total: number;
+  items: Array<{
+    qty: number;
+    product: { name: string } | null;
+    customName: string | null;
+  }>;
+};
+
 /* ========= Utiles ========= */
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+const fmt = (n: number | string) => `$${Number(n).toFixed(2)}`;
 
 const ORDER_PRINCIPALES = [
   'Hamburguesas y Sandwiches',
@@ -177,6 +189,15 @@ export default function CashierPage() {
   const [beeperId, setBeeperId] = React.useState<number | ''>('');
   const [bErr, setBErr] = React.useState<string | null>(null);
 
+  // Estados para crear pedido
+  const [isCreatingOrder, setIsCreatingOrder] = React.useState(false);
+  const [orderSuccess, setOrderSuccess] = React.useState<{ number: number; beeperId: number } | null>(null);
+
+  // Pedidos listos para entregar
+  const [readyOrders, setReadyOrders] = React.useState<ReadyOrder[]>([]);
+  const [showReady, setShowReady] = React.useState(false);
+  const [deliveringOrder, setDeliveringOrder] = React.useState<string | null>(null);
+
   // Ítem abierto sheet
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
@@ -203,14 +224,21 @@ export default function CashierPage() {
   React.useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/beepers?available=true', { cache: 'no-store' });
+        const r = await fetch('/api/beepers', { cache: 'no-store' });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j: { available: number[] } = await r.json();
-        setBeepers(j.available);
+        const j: Array<{ id: number; status: string }> = await r.json();
+        setBeepers(j.map(b => b.id));
       } catch (e) {
         setBErr(e instanceof Error ? e.message : 'Error cargando beepers');
       }
     })();
+  }, []);
+
+  React.useEffect(() => {
+    loadReadyOrders();
+    // Recargar cada 15 segundos
+    const interval = setInterval(loadReadyOrders, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   /* === Agrupación de la caja === */
@@ -258,6 +286,100 @@ export default function CashierPage() {
   const dec = (k: string) => setCart((c) => c.map((it) => (it.key === k ? { ...it, qty: Math.max(1, it.qty - 1) } : it)));
   const rem = (k: string) => setCart((c) => c.filter((it) => it.key !== k));
   const clear = () => setCart([]);
+
+  const createOrder = async () => {
+    if (cart.length === 0 || beeperId === '') return;
+    
+    setIsCreatingOrder(true);
+    try {
+      // Preparar items para el API
+      const items = cart.map(item => ({
+        productId: item.productId || undefined,
+        customName: item.productId ? undefined : item.name,
+        qty: item.qty,
+        unitPrice: item.productId ? undefined : item.price
+      }));
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          beeperId: Number(beeperId)
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Mostrar éxito
+      setOrderSuccess({ number: result.number, beeperId: result.beeperId });
+      
+      // Limpiar carrito y beeper
+      clear();
+      setBeeperId('');
+      
+      // Recargar beepers disponibles
+      const beeperResponse = await fetch('/api/beepers', { cache: 'no-store' });
+      if (beeperResponse.ok) {
+        const beepers: Array<{ id: number; status: string }> = await beeperResponse.json();
+        setBeepers(beepers.map(b => b.id));
+      }
+      
+    } catch (error) {
+      alert(`Error creando pedido: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
+
+  const loadReadyOrders = async () => {
+    try {
+      const response = await fetch('/api/orders/ready', { cache: 'no-store' });
+      if (response.ok) {
+        const data: ReadyOrder[] = await response.json();
+        setReadyOrders(data);
+      }
+    } catch (error) {
+      console.error('Error cargando pedidos listos:', error);
+    }
+  };
+
+  const deliverOrder = async (orderId: string) => {
+    setDeliveringOrder(orderId);
+    try {
+      const response = await fetch(`/api/orders/${orderId}/deliver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      // Recargar pedidos listos y beepers
+      await Promise.all([
+        loadReadyOrders(),
+        (async () => {
+          const beeperResponse = await fetch('/api/beepers', { cache: 'no-store' });
+          if (beeperResponse.ok) {
+            const beepers: Array<{ id: number; status: string }> = await beeperResponse.json();
+            setBeepers(beepers.map(b => b.id));
+          }
+        })()
+      ]);
+      
+    } catch (error) {
+      alert(`Error entregando pedido: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setDeliveringOrder(null);
+    }
+  };
 
   /* === Returns tempranos === */
   if (loading) {
@@ -313,14 +435,24 @@ export default function CashierPage() {
       <div className="grid gap-5">
         <div className="flex items-center justify-between rounded-xl bg-white border border-gray-200 px-4 py-3">
           <div className="font-semibold" style={{ color: 'var(--ink)' }}>{crumbs}</div>
-          {step !== 'root' && (
-            <button
-              onClick={goBack}
-              className="rounded-lg border border-gray-300 px-3 py-2 hover:bg-gray-50"
-            >
-              ← Atrás
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {readyOrders.length > 0 && (
+              <button
+                onClick={() => setShowReady(!showReady)}
+                className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 hover:bg-orange-100 text-orange-700 font-medium"
+              >
+                📦 Listos ({readyOrders.length})
+              </button>
+            )}
+            {step !== 'root' && (
+              <button
+                onClick={goBack}
+                className="rounded-lg border border-gray-300 px-3 py-2 hover:bg-gray-50"
+              >
+                ← Atrás
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Paso 1 */}
@@ -415,6 +547,61 @@ export default function CashierPage() {
             )}
           </div>
         )}
+
+        {/* Vista de pedidos listos */}
+        {showReady && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">📦 Pedidos Listos para Entregar</h2>
+              <button
+                onClick={() => setShowReady(false)}
+                className="rounded-lg border border-gray-300 px-3 py-2 hover:bg-gray-50"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+            
+            {readyOrders.length === 0 ? (
+              <div className="text-center py-8 rounded-xl bg-gray-50 border border-gray-200">
+                <div className="text-4xl mb-2">😴</div>
+                <div className="text-gray-600">No hay pedidos listos</div>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {readyOrders.map((order) => (
+                  <div key={order.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-lg font-bold">Pedido #{order.number}</div>
+                      <div className="bg-orange-100 text-orange-700 px-2 py-1 rounded-lg text-sm font-semibold">
+                        Beeper {order.beeperId}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1 mb-3 text-sm">
+                      {order.items.map((item, idx) => (
+                        <div key={idx}>
+                          {item.qty}x {item.product?.name || item.customName}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                      <div className="font-bold">Total: {fmt(order.total)}</div>
+                      <button
+                        onClick={() => deliverOrder(order.id)}
+                        disabled={deliveringOrder === order.id}
+                        className="px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                        style={{ background: 'var(--brand)', color: '#0a0a0a' }}
+                      >
+                        {deliveringOrder === order.id ? '⏳' : '🚚 Entregar'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* DERECHA: Caja */}
@@ -499,10 +686,10 @@ export default function CashierPage() {
               <button
                 className="flex-1 rounded-xl border px-4 py-3 font-semibold disabled:opacity-50"
                 style={{ borderColor: 'var(--brand)', background: 'rgba(141,255,80,.15)', color: '#0a0a0a' }}
-                disabled={cart.length === 0 || beeperId === ''}
-                onClick={() => alert('Continuará: creación de pedido y envío a cocina.')}
+                disabled={cart.length === 0 || beeperId === '' || isCreatingOrder}
+                onClick={createOrder}
               >
-                Cobrar (próximo paso)
+                {isCreatingOrder ? 'Creando pedido...' : 'Crear Pedido'}
               </button>
               <button className="rounded-xl border border-gray-300 hover:bg-gray-50 px-3" onClick={clear} disabled={cart.length === 0}>
                 Vaciar
@@ -523,6 +710,28 @@ export default function CashierPage() {
         onClose={() => setSheetOpen(false)}
         onAdd={addOpenItem}
       />
+      
+      {/* Modal de éxito */}
+      {orderSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOrderSuccess(null)} />
+          <div className="relative bg-white rounded-2xl p-6 max-w-sm mx-4 text-center">
+            <div className="text-4xl mb-4">✅</div>
+            <div className="text-xl font-semibold mb-2">¡Pedido Creado!</div>
+            <div className="text-gray-600 mb-4">
+              Pedido #{orderSuccess.number}<br/>
+              Beeper #{orderSuccess.beeperId}
+            </div>
+            <button
+              onClick={() => setOrderSuccess(null)}
+              className="rounded-xl px-6 py-2 font-semibold"
+              style={{ background: 'var(--brand)', color: '#0a0a0a' }}
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

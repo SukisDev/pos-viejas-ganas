@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 const prisma = new PrismaClient();
 
-async function requireRoles(rolesAllowed: Array<'ADMIN' | 'CASHIER'>) {
+async function requireRoles(rolesAllowed: Array<'ADMIN' | 'CASHIER'>): Promise<NextResponse | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(process.env.AUTH_COOKIE_NAME ?? 'vg_session')?.value;
   if (!token) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
@@ -16,7 +16,7 @@ async function requireRoles(rolesAllowed: Array<'ADMIN' | 'CASHIER'>) {
   if (!rolesAllowed.includes(payload.role as 'ADMIN' | 'CASHIER')) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
-  return null as const;
+  return null;
 }
 
 export async function GET() {
