@@ -1057,6 +1057,31 @@ export default function AdminPage() {
                     >
                       ➕ Agregar Producto
                     </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/admin/categories', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'cleanup_temp' }),
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            showSuccessMessage(result.message);
+                            fetchCategories();
+                            fetchProducts();
+                          } else {
+                            showSuccessMessage(result.error || 'Error en limpieza', true);
+                          }
+                        } catch (err) {
+                          showSuccessMessage('Error en limpieza', true);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-lg bg-gray-600 text-white text-sm hover:bg-gray-700 transition-colors"
+                      title="Limpiar productos temporales"
+                    >
+                      🧹 Limpiar
+                    </button>
                   </div>
                 </div>
 

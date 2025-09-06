@@ -56,10 +56,37 @@ export async function GET(request: Request) {
       return NextResponse.json(result);
     }
 
-    const where: Record<string, string> = {};
+    const where: {
+      category?: string;
+      AND?: Array<{
+        NOT: {
+          name: {
+            startsWith: string;
+          };
+        };
+      }>;
+    } = {};
     if (category && category !== 'all') {
       where.category = category;
     }
+
+    // Excluir productos temporales y marcadores de categoría
+    where.AND = [
+      {
+        NOT: {
+          name: {
+            startsWith: '_TEMP_'
+          }
+        }
+      },
+      {
+        NOT: {
+          name: {
+            startsWith: '_CATEGORY_MARKER_'
+          }
+        }
+      }
+    ];
 
     const products = await prisma.product.findMany({
       where,
@@ -137,16 +164,6 @@ export async function POST(request: Request) {
         price: true,
         active: true,
         createdAt: true
-      }
-    });
-
-    // Eliminar productos temporales de esta categoría ya que ahora tiene un producto real
-    await prisma.product.deleteMany({
-      where: {
-        category: category.trim(),
-        name: {
-          startsWith: '_TEMP_'
-        }
       }
     });
 
@@ -283,38 +300,10 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
     }
 
-    const category = product.category;
-
     // Eliminar el producto
     await prisma.product.delete({
       where: { id: productId }
     });
-
-    // Verificar si quedan productos reales en esta categoría
-    if (category) {
-      const remainingRealProducts = await prisma.product.count({
-        where: {
-          category: category,
-          name: {
-            not: {
-              startsWith: '_TEMP_'
-            }
-          }
-        }
-      });
-
-      // Si no quedan productos reales, crear un producto temporal para mantener la categoría
-      if (remainingRealProducts === 0) {
-        await prisma.product.create({
-          data: {
-            name: `_TEMP_${category}_${Date.now()}`,
-            category: category,
-            price: 0.01,
-            active: false
-          }
-        });
-      }
-    }
 
     return NextResponse.json({ message: 'Producto eliminado exitosamente' });
 

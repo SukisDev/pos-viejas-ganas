@@ -22,14 +22,14 @@ async function requireAdmin(): Promise<{ error: NextResponse } | { userId: strin
   return { userId: payload.sub };
 }
 
-// GET - Obtener todas las categorías
+// GET - Obtener todas las categorías (incluyendo vacías)
 export async function GET() {
   const auth = await requireAdmin();
   if ('error' in auth) return auth.error;
 
   try {
-    // Obtener todas las categorías únicas (incluyendo las que solo tienen productos temporales)
-    const allCategories = await prisma.product.groupBy({
+    // Obtener categorías que tienen productos
+    const categoriesWithProducts = await prisma.product.groupBy({
       by: ['category'],
       where: {
         category: {
@@ -41,26 +41,63 @@ export async function GET() {
       }
     });
 
+    // Buscar categorías que fueron creadas pero que podrían no tener productos reales
+    // Esto incluye las que solo tienen productos temporales o fueron creadas vacías
+    const allDbCategories = await prisma.product.findMany({
+      select: { category: true },
+      where: {
+        category: { not: null }
+      },
+      distinct: ['category']
+    });
+
+    // Crear un Set para evitar duplicados
+    const allCategoryNames = new Set<string>();
+    
+    // Agregar categorías con productos
+    categoriesWithProducts.forEach(cat => {
+      if (cat.category) allCategoryNames.add(cat.category);
+    });
+
+    // Agregar todas las categorías de la DB (incluso con solo productos temporales)
+    allDbCategories.forEach(cat => {
+      if (cat.category) allCategoryNames.add(cat.category);
+    });
+
     // Para cada categoría, contar solo los productos reales (no temporales)
     const formattedCategories = await Promise.all(
-      allCategories.map(async (cat) => {
+      Array.from(allCategoryNames).map(async (categoryName) => {
         const realProductsCount = await prisma.product.count({
           where: {
-            category: cat.category,
-            name: {
-              not: {
-                startsWith: '_TEMP_'
+            category: categoryName,
+            AND: [
+              {
+                NOT: {
+                  name: {
+                    startsWith: '_TEMP_'
+                  }
+                }
+              },
+              {
+                NOT: {
+                  name: {
+                    startsWith: '_CATEGORY_MARKER_'
+                  }
+                }
               }
-            }
+            ]
           }
         });
 
         return {
-          name: cat.category,
+          name: categoryName,
           count: realProductsCount
         };
       })
     );
+
+    // Ordenar por nombre
+    formattedCategories.sort((a, b) => a.name.localeCompare(b.name));
 
     return NextResponse.json(formattedCategories);
   } catch (error) {
@@ -69,7 +106,7 @@ export async function GET() {
   }
 }
 
-// POST - Crear nueva categoría (sin producto temporal)
+// POST - Crear nueva categoría (con registro persistente)
 export async function POST(request: Request) {
   const auth = await requireAdmin();
   if ('error' in auth) return auth.error;
@@ -92,9 +129,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'La categoría ya existe' }, { status: 400 });
     }
 
-    // Ya no creamos producto temporal - las categorías se crean cuando se agrega el primer producto
+    // Crear un marcador invisible para mantener la categoría en la DB
+    // Este producto no aparecerá en ningún listado ni interfiere con la funcionalidad
+    await prisma.product.create({
+      data: {
+        name: `_CATEGORY_MARKER_${categoryName}_${Date.now()}`,
+        category: categoryName,
+        price: 0.01,
+        active: false
+      }
+    });
+
     return NextResponse.json({ 
-      message: 'Categoría será creada cuando agregues el primer producto',
+      message: 'Categoría creada exitosamente',
       category: categoryName
     });
   } catch (error) {
@@ -173,15 +220,26 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Nombre de categoría requerido' }, { status: 400 });
     }
 
-    // Verificar cuántos productos tiene la categoría
+    // Verificar cuántos productos reales tiene la categoría
     const productCount = await prisma.product.count({
       where: { 
         category: categoryName,
-        name: {
-          not: {
-            startsWith: '_TEMP_'
+        AND: [
+          {
+            NOT: {
+              name: {
+                startsWith: '_TEMP_'
+              }
+            }
+          },
+          {
+            NOT: {
+              name: {
+                startsWith: '_CATEGORY_MARKER_'
+              }
+            }
           }
-        }
+        ]
       }
     });
 
@@ -192,13 +250,22 @@ export async function DELETE(request: Request) {
       }, { status: 400 });
     }
 
-    // Eliminar productos temporales de la categoría
+    // Eliminar productos temporales y marcadores de la categoría
     const deleteResult = await prisma.product.deleteMany({
       where: { 
         category: categoryName,
-        name: {
-          startsWith: '_TEMP_'
-        }
+        OR: [
+          {
+            name: {
+              startsWith: '_TEMP_'
+            }
+          },
+          {
+            name: {
+              startsWith: '_CATEGORY_MARKER_'
+            }
+          }
+        ]
       }
     });
 
@@ -208,6 +275,46 @@ export async function DELETE(request: Request) {
     });
   } catch (error) {
     console.error('Error deleting category:', error);
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  }
+}
+
+// PUT - Limpiar productos temporales
+export async function PUT(request: Request) {
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
+  try {
+    const { action } = await request.json();
+
+    if (action === 'cleanup_temp') {
+      // Eliminar TODOS los productos temporales y marcadores
+      const deleteResult = await prisma.product.deleteMany({
+        where: {
+          OR: [
+            {
+              name: {
+                startsWith: '_TEMP_'
+              }
+            },
+            {
+              name: {
+                startsWith: '_CATEGORY_MARKER_'
+              }
+            }
+          ]
+        }
+      });
+
+      return NextResponse.json({ 
+        message: `Se eliminaron ${deleteResult.count} productos temporales y marcadores`,
+        deletedCount: deleteResult.count
+      });
+    }
+
+    return NextResponse.json({ error: 'Acción no válida' }, { status: 400 });
+  } catch (error) {
+    console.error('Error cleaning up temp products:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
