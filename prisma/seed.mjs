@@ -113,6 +113,73 @@ async function main() {
 
   await prisma.product.createMany({ data: products });
 
+  // Crear algunas órdenes de ejemplo para probar el calendario
+  const createdProducts = await prisma.product.findMany({ take: 5 });
+  const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  const firstBeeper = await prisma.beeper.findFirst({ where: { status: 'AVAILABLE' } });
+  
+  if (createdProducts.length > 0 && adminUser && firstBeeper) {
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const lastWeek = new Date(now);
+    lastWeek.setDate(now.getDate() - 7);
+
+    // Crear órdenes de diferentes fechas
+    const sampleOrders = [
+      {
+        number: 1,
+        businessDate: now,
+        status: 'DELIVERED',
+        total: 25.50,
+        beeperId: firstBeeper.id,
+        cashierId: adminUser.id,
+        createdAt: now,
+        updatedAt: now
+      },
+      {
+        number: 2,
+        businessDate: yesterday,
+        status: 'DELIVERED',
+        total: 18.75,
+        beeperId: firstBeeper.id,
+        cashierId: adminUser.id,
+        createdAt: yesterday,
+        updatedAt: yesterday
+      },
+      {
+        number: 3,
+        businessDate: lastWeek,
+        status: 'DELIVERED',
+        total: 32.00,
+        beeperId: firstBeeper.id,
+        cashierId: adminUser.id,
+        createdAt: lastWeek,
+        updatedAt: lastWeek
+      }
+    ];
+
+    for (const orderData of sampleOrders) {
+      await prisma.order.create({
+        data: {
+          ...orderData,
+          items: {
+            create: [
+              {
+                qty: 2,
+                unitPrice: createdProducts[0].price,
+                lineTotal: createdProducts[0].price * 2,
+                customName: null,
+                notes: null,
+                productId: createdProducts[0].id
+              }
+            ]
+          }
+        }
+      });
+    }
+  }
+
   console.log('Seed OK ✓');
 }
 

@@ -30,10 +30,12 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const status = url.searchParams.get('status');
     const date = url.searchParams.get('date');
+    const search = url.searchParams.get('search');
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '20');
 
-    const where: Record<string, string | object> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where = {} as any;
     
     if (status && status !== 'all') {
       where.status = status;
@@ -50,6 +52,13 @@ export async function GET(request: Request) {
         gte: startOfDay,
         lte: endOfDay
       };
+    }
+
+    if (search) {
+      const searchNumber = parseInt(search);
+      if (!isNaN(searchNumber)) {
+        where.number = searchNumber;
+      }
     }
 
     const [orders, total] = await Promise.all([

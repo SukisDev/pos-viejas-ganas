@@ -127,8 +127,28 @@ export default function AdminPage() {
   const [ordersError, setOrdersError] = React.useState<string | null>(null);
   const [orderFilters, setOrderFilters] = React.useState({
     status: 'all',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    search: ''
   });
+  const [expandedOrderId, setExpandedOrderId] = React.useState<string | null>(null);
+  
+  // Estados para el calendario de pedidos
+  interface MonthWithOrders {
+    monthKey: string;
+    monthName: string;
+    year: number;
+    month: number;
+    dates: Array<{
+      date: string;
+      count: number;
+      fullDate: Date;
+    }>;
+  }
+  
+  const [monthsWithOrders, setMonthsWithOrders] = React.useState<MonthWithOrders[]>([]);
+  const [selectedMonth, setSelectedMonth] = React.useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
+  const [datesLoading, setDatesLoading] = React.useState(false);
 
   // Products state
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -255,6 +275,7 @@ export default function AdminPage() {
       const params = new URLSearchParams();
       if (orderFilters.status !== 'all') params.append('status', orderFilters.status);
       if (orderFilters.date) params.append('date', orderFilters.date);
+      if (orderFilters.search) params.append('search', orderFilters.search);
       
       const response = await fetch(`/api/admin/orders?${params}`);
       if (!response.ok) throw new Error('Error al obtener pedidos');
@@ -268,6 +289,29 @@ export default function AdminPage() {
       setOrdersLoading(false);
     }
   }, [orderFilters]);
+
+  // Función para cargar las fechas con pedidos
+  const fetchOrderDates = React.useCallback(async () => {
+    console.log('fetchOrderDates called');
+    try {
+      setDatesLoading(true);
+      const response = await fetch('/api/admin/orders/dates');
+      if (!response.ok) throw new Error('Error al obtener fechas');
+      
+      const data = await response.json();
+      console.log('Dates data received:', data);
+      setMonthsWithOrders(data.monthsWithOrders);
+      
+      // Seleccionar el mes más reciente por defecto
+      if (data.monthsWithOrders.length > 0 && !selectedMonth) {
+        setSelectedMonth(data.monthsWithOrders[0].monthKey);
+      }
+    } catch (err) {
+      console.error('Error fetching order dates:', err);
+    } finally {
+      setDatesLoading(false);
+    }
+  }, [selectedMonth]);
 
   const fetchProducts = React.useCallback(async () => {
     try {
@@ -824,10 +868,50 @@ export default function AdminPage() {
   }, [loadStats, loadStatsSilent]);
 
   React.useEffect(() => {
+    console.log('Effect for orders dates triggered, activeTab:', activeTab);
     if (activeTab === 'orders') {
+      console.log('About to call fetchOrderDates');
+      
+      // Función para cargar las fechas con pedidos
+      const loadOrderDates = async () => {
+        console.log('loadOrderDates called');
+        try {
+          setDatesLoading(true);
+          const response = await fetch('/api/admin/orders/dates');
+          if (!response.ok) throw new Error('Error al obtener fechas');
+          
+          const data = await response.json();
+          console.log('Dates data received:', data);
+          setMonthsWithOrders(data.monthsWithOrders);
+          
+          // Seleccionar el mes más reciente por defecto
+          if (data.monthsWithOrders.length > 0 && !selectedMonth) {
+            setSelectedMonth(data.monthsWithOrders[0].monthKey);
+          }
+        } catch (err) {
+          console.error('Error fetching order dates:', err);
+        } finally {
+          setDatesLoading(false);
+        }
+      };
+      
+      loadOrderDates();
+    }
+  }, [activeTab, selectedMonth]);
+
+  React.useEffect(() => {
+    if (activeTab === 'orders' && selectedDate) {
+      // Actualizar filtros cuando se selecciona una fecha
+      setOrderFilters(prev => ({ ...prev, date: selectedDate }));
+    }
+  }, [selectedDate, activeTab]);
+
+  // Cargar pedidos cuando cambian los filtros
+  React.useEffect(() => {
+    if (activeTab === 'orders' && selectedDate) {
       fetchOrders();
     }
-  }, [activeTab, fetchOrders]);
+  }, [activeTab, selectedDate, orderFilters, fetchOrders]);
 
   React.useEffect(() => {
     if (activeTab === 'products') {
@@ -1190,122 +1274,371 @@ export default function AdminPage() {
 
         {/* Orders Tab */}
         {activeTab === 'orders' && (
-          <div className="space-y-6">
-            {/* Filters */}
-            <div className="rounded-2xl bg-white/10 p-4 border border-white/20">
-              <div className="flex flex-wrap gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Estado:</label>
-                  <select
-                    value={orderFilters.status}
-                    onChange={(e) => setOrderFilters(prev => ({ ...prev, status: e.target.value }))}
-                    className="px-3 py-2 rounded-lg bg-[#2A3441] border border-white/20 text-white focus:border-blue-500 focus:outline-none"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 0.5rem center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '1.5em 1.5em'
-                    }}
+          <div className="space-y-8">
+            {/* Navegación de calendario */}
+            {!selectedDate ? (
+              <div>
+                {/* Botón de debug */}
+                <div className="mb-4">
+                  <button
+                    onClick={() => fetchOrderDates()}
+                    className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
                   >
-                    <option value="all" className="bg-[#2A3441] text-white">Todos</option>
-                    <option value="IN_KITCHEN" className="bg-[#2A3441] text-white">En Cocina</option>
-                    <option value="READY" className="bg-[#2A3441] text-white">Listo</option>
-                    <option value="DELIVERED" className="bg-[#2A3441] text-white">Entregado</option>
-                    <option value="CANCELLED" className="bg-[#2A3441] text-white">Cancelado</option>
-                  </select>
+                    🔄 Cargar Fechas
+                  </button>
+                  <span className="ml-4 text-white/60">
+                    Debug: {monthsWithOrders.length} meses encontrados
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Fecha:</label>
-                  <input
-                    type="date"
-                    value={orderFilters.date}
-                    onChange={(e) => setOrderFilters(prev => ({ ...prev, date: e.target.value }))}
-                    className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white"
-                  />
-                </div>
-              </div>
-            </div>
 
-            {ordersLoading && (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8DFF50] mx-auto"></div>
-              </div>
-            )}
+                {datesLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
+                    <p className="text-white/60 text-lg">Cargando fechas...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {monthsWithOrders.map((monthData) => (
+                      <div key={monthData.monthKey} className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-8 border border-white/20">
+                        {/* Header del mes */}
+                        <div className="text-center mb-8">
+                          <h2 className="text-4xl font-bold text-white mb-2">{monthData.monthName} {monthData.year}</h2>
+                          <p className="text-white/60 text-lg">
+                            {monthData.dates.reduce((sum, date) => sum + date.count, 0)} pedidos en {monthData.dates.length} día{monthData.dates.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
 
-            {ordersError && (
-              <div className="rounded-2xl bg-red-500/20 border border-red-500/50 p-4 text-red-200">
-                {ordersError}
-              </div>
-            )}
-
-            {!ordersLoading && !ordersError && (
-              <div className="space-y-4">
-                {orders.map((order) => (
-                  <div key={order.id} className="rounded-2xl bg-white/10 p-6 border border-white/20">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-[#8DFF50]">Pedido #{order.number}</h3>
-                        <p className="text-white/60">Beeper {order.beeperId} • {formatDate(order.createdAt)}</p>
-                        <p className="text-white/60">Cajero: {order.cashier.name} • {order.chef ? `Chef: ${order.chef.name}` : 'Sin chef asignado'}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold">{fmt(order.total)}</div>
-                        <div className={`inline-block px-3 py-1 rounded-lg text-sm font-medium ${STATUS_COLORS[order.status] || 'bg-gray-500/20 text-gray-400'}`}>
-                          {STATUS_LABELS[order.status] || order.status}
+                        {/* Grid de fechas */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-4">
+                          {monthData.dates.map((dateInfo) => {
+                            const date = new Date(dateInfo.date);
+                            const dayNumber = date.getDate();
+                            const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' });
+                            
+                            return (
+                              <button
+                                key={dateInfo.date}
+                                onClick={() => setSelectedDate(dateInfo.date)}
+                                className="group relative rounded-2xl bg-gradient-to-br from-[#8DFF50]/10 to-[#7DE040]/10 border border-[#8DFF50]/30 p-6 hover:from-[#8DFF50]/20 hover:to-[#7DE040]/20 hover:border-[#8DFF50]/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[#8DFF50]/20"
+                              >
+                                <div className="text-center">
+                                  <div className="text-3xl font-bold text-white mb-1">{dayNumber}</div>
+                                  <div className="text-sm text-white/60 capitalize mb-2">{dayName}</div>
+                                  <div className="text-xs bg-[#8DFF50]/20 text-[#8DFF50] px-2 py-1 rounded-full">
+                                    {dateInfo.count} pedido{dateInfo.count !== 1 ? 's' : ''}
+                                  </div>
+                                </div>
+                                
+                                {/* Efecto hover */}
+                                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#8DFF50]/5 to-[#7DE040]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
+                    ))}
 
-                    <div className="mb-4">
-                      <h4 className="font-medium mb-2">Items:</h4>
-                      <div className="space-y-2">
-                        {order.items.map((item) => (
-                          <div key={item.id} className="flex justify-between bg-white/5 p-2 rounded">
-                            <span>{item.qty}x {item.product?.name || item.customName}</span>
-                            <span>{fmt(item.lineTotal)}</span>
-                          </div>
-                        ))}
+                    {monthsWithOrders.length === 0 && !datesLoading && (
+                      <div className="text-center py-16">
+                        <div className="text-8xl mb-4">📅</div>
+                        <h3 className="text-2xl font-bold text-white mb-2">No hay pedidos</h3>
+                        <p className="text-white/60">Aún no se han registrado pedidos en el sistema</p>
                       </div>
-                    </div>
-
-                    {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
-                      <div className="flex gap-2">
-                        {order.status === 'IN_KITCHEN' && (
-                          <button
-                            onClick={() => updateOrderStatus(order.id, 'READY')}
-                            className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
-                          >
-                            Marcar Listo
-                          </button>
-                        )}
-                        {order.status === 'READY' && (
-                          <button
-                            onClick={() => updateOrderStatus(order.id, 'DELIVERED')}
-                            className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600"
-                          >
-                            Marcar Entregado
-                          </button>
-                        )}
-                        <button
-                          onClick={() => updateOrderStatus(order.id, 'CANCELLED')}
-                          className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    )}
-
-                    {order.deliveredAt && (
-                      <p className="text-white/60 text-sm mt-2">
-                        Entregado: {formatDate(order.deliveredAt)}
-                      </p>
                     )}
                   </div>
-                ))}
+                )}
+              </div>
+            ) : (
+              /* Vista de pedidos para fecha seleccionada */
+              <div className="space-y-6">
+                {/* Header con botón de regreso */}
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setSelectedDate(null)}
+                      className="px-4 py-2 rounded-2xl bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                      Volver al calendario
+                    </button>
+                    <div>
+                      <h2 className="text-3xl font-bold text-white">
+                        Pedidos del {new Date(selectedDate).toLocaleDateString('es-ES', { 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric',
+                          weekday: 'long'
+                        })}
+                      </h2>
+                      <p className="text-white/60">
+                        {orders.length} pedido{orders.length !== 1 ? 's' : ''} encontrado{orders.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-                {orders.length === 0 && !ordersLoading && (
-                  <div className="text-center py-8 text-white/60">
-                    No se encontraron pedidos
+                {/* Estadísticas del día */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="rounded-3xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-blue-500/30 flex items-center justify-center">
+                        <span className="text-3xl">📋</span>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-white">{orders.length}</div>
+                        <div className="text-blue-200">Total Pedidos</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-3xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30 p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-orange-500/30 flex items-center justify-center">
+                        <span className="text-3xl">🍳</span>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'IN_KITCHEN').length}</div>
+                        <div className="text-orange-200">En Cocina</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-3xl bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-green-500/30 flex items-center justify-center">
+                        <span className="text-3xl">✅</span>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'READY').length}</div>
+                        <div className="text-green-200">Listos</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-3xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-purple-500/30 flex items-center justify-center">
+                        <span className="text-3xl">💰</span>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-white">{fmt(orders.reduce((sum, o) => sum + o.total, 0))}</div>
+                        <div className="text-purple-200">Total Ventas</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtros */}
+                <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-6 border border-white/20">
+                  <h3 className="text-xl font-bold mb-4 text-white">🔍 Filtros</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-white/80">Estado:</label>
+                      <select
+                        value={orderFilters.status}
+                        onChange={(e) => setOrderFilters(prev => ({ ...prev, status: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors"
+                      >
+                        <option value="all" className="bg-[#2A3441] text-white">🌟 Todos los Estados</option>
+                        <option value="IN_KITCHEN" className="bg-[#2A3441] text-white">🍳 En Cocina</option>
+                        <option value="READY" className="bg-[#2A3441] text-white">✅ Listo</option>
+                        <option value="DELIVERED" className="bg-[#2A3441] text-white">🚚 Entregado</option>
+                        <option value="CANCELLED" className="bg-[#2A3441] text-white">❌ Cancelado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-white/80">Buscar por número:</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: 123"
+                        value={orderFilters.search || ''}
+                        onChange={(e) => setOrderFilters(prev => ({ ...prev, search: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:border-[#8DFF50] focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={() => setOrderFilters(prev => ({ ...prev, status: 'all', search: '' }))}
+                        className="w-full px-4 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors"
+                      >
+                        🧹 Limpiar Filtros
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {ordersLoading && (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
+                    <p className="text-white/60 text-lg">Cargando pedidos...</p>
+                  </div>
+                )}
+
+                {ordersError && (
+                  <div className="rounded-3xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 p-6 text-red-200 flex items-center gap-4">
+                    <span className="text-3xl">⚠️</span>
+                    <div>
+                      <h3 className="font-bold mb-1">Error al cargar pedidos</h3>
+                      <p>{ordersError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {!ordersLoading && !ordersError && (
+                  <div className="space-y-4">
+                    {orders.map((order) => {
+                      const isExpanded = expandedOrderId === order.id;
+                      return (
+                        <div key={order.id} className="group rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 hover:border-[#8DFF50]/50 transition-all duration-300 overflow-hidden">
+                          {/* Header del pedido (siempre visible) */}
+                          <div 
+                            className="p-6 cursor-pointer hover:bg-white/5 transition-colors"
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                          >
+                            <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
+                              <div className="flex items-center gap-4 flex-1">
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center">
+                                  <span className="text-[#1D263B] font-bold text-lg">#{order.number}</span>
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <h3 className="text-xl font-bold text-white">Pedido #{order.number}</h3>
+                                    <div className={`px-3 py-1 rounded-xl text-xs font-bold ${STATUS_COLORS[order.status] || 'bg-gray-500/20 text-gray-400'}`}>
+                                      {STATUS_LABELS[order.status] || order.status}
+                                    </div>
+                                  </div>
+                                  <p className="text-white/60 text-sm">📟 Beeper {order.beeperId} • ⏰ {formatDate(order.createdAt)}</p>
+                                  <div className="flex items-center gap-4 mt-2 text-sm">
+                                    <span className="text-white/60">💳 {order.cashier.name}</span>
+                                    <span className="text-white/60">👨‍🍳 {order.chef ? order.chef.name : 'Sin asignar'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-[#8DFF50]">{fmt(order.total)}</div>
+                                  <div className="text-white/60 text-sm">{order.items.length} productos</div>
+                                </div>
+                                <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                                  <svg className="w-6 h-6 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Contenido expandible */}
+                          <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
+                            <div className="px-6 pb-6 border-t border-white/10">
+                              {/* Items del pedido */}
+                              <div className="mt-6 mb-6">
+                                <h4 className="font-bold text-lg mb-4 text-white flex items-center gap-2">
+                                  <span>🛒</span> Productos del Pedido
+                                </h4>
+                                <div className="grid gap-3">
+                                  {order.items.map((item) => (
+                                    <div key={item.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-[#8DFF50]/20 flex items-center justify-center text-[#8DFF50] font-bold">
+                                          {item.qty}
+                                        </div>
+                                        <div>
+                                          <div className="font-semibold text-white">{item.product?.name || item.customName}</div>
+                                          <div className="text-white/60 text-sm">{fmt(item.unitPrice)} c/u</div>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="font-bold text-lg text-white">{fmt(item.lineTotal)}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Información adicional */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xl">💳</span>
+                                    <div>
+                                      <div className="text-sm text-white/60">Cajero</div>
+                                      <div className="font-semibold text-white">{order.cashier.name}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xl">👨‍🍳</span>
+                                    <div>
+                                      <div className="text-sm text-white/60">Chef</div>
+                                      <div className="font-semibold text-white">{order.chef ? order.chef.name : 'Sin asignar'}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Acciones del pedido */}
+                              {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                                <div className="flex flex-wrap gap-3 mb-4">
+                                  {order.status === 'IN_KITCHEN' && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateOrderStatus(order.id, 'READY');
+                                      }}
+                                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center gap-2 shadow-lg"
+                                    >
+                                      <span>✅</span> Marcar Listo
+                                    </button>
+                                  )}
+                                  {order.status === 'READY' && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateOrderStatus(order.id, 'DELIVERED');
+                                      }}
+                                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center gap-2 shadow-lg"
+                                    >
+                                      <span>🚚</span> Marcar Entregado
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateOrderStatus(order.id, 'CANCELLED');
+                                    }}
+                                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-bold hover:from-red-600 hover:to-red-700 transition-all duration-200 flex items-center gap-2 shadow-lg"
+                                  >
+                                    <span>❌</span> Cancelar
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Información de entrega */}
+                              {order.deliveredAt && (
+                                <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/30">
+                                  <p className="text-green-200 flex items-center gap-2">
+                                    <span>🚚</span> Entregado: {formatDate(order.deliveredAt)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {orders.length === 0 && !ordersLoading && (
+                      <div className="text-center py-16">
+                        <div className="text-8xl mb-4">📋</div>
+                        <h3 className="text-2xl font-bold text-white mb-2">No hay pedidos</h3>
+                        <p className="text-white/60">No se encontraron pedidos para esta fecha con los filtros seleccionados</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
