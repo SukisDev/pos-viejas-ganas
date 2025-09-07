@@ -23,10 +23,9 @@ async function requireRoles(rolesAllowed: Array<'ADMIN' | 'CASHIER' | 'CHEF'>): 
 }
 
 function getPanamaDate(): Date {
-  const now = new Date();
-  const panama = new Date(now.toLocaleString('en-US', { timeZone: 'America/Panama' }));
-  panama.setHours(0, 0, 0, 0);
-  return panama;
+  // SOLUCIÓN SIMPLE: obtener fecha de hoy en formato consistente
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Panama' });
+  return new Date(today + 'T00:00:00.000Z');
 }
 
 interface OrderItemRequest {

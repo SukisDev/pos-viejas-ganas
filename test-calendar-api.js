@@ -3,60 +3,87 @@
 
 console.log('=== TEST CALENDARIO VIEJAS GANAS ===');
 
-// Simular cambio de activeTab a 'orders'
-console.log('1. Simulando cambio de activeTab a "orders"...');
-
-// Simular llamada a fetchOrderDates
+// Test 1: Cargar fechas disponibles
 async function testFetchOrderDates() {
-  console.log('2. Ejecutando fetchOrderDates...');
+  console.log('1. Probando fetchOrderDates...');
   
   try {
     const response = await fetch('http://localhost:3000/api/admin/orders/dates');
-    console.log('3. Response status:', response.status);
+    console.log('   Response status:', response.status);
     
     if (response.ok) {
       const data = await response.json();
-      console.log('4. Datos recibidos:', data);
+      console.log('   ✅ Fechas disponibles:', data.monthsWithOrders.length, 'meses');
       
-      if (data.success && data.monthsWithOrders) {
-        console.log('5. ✅ Meses con órdenes:', data.monthsWithOrders.length);
-        
-        data.monthsWithOrders.forEach((month, index) => {
-          console.log(`   Mes ${index + 1}: ${month.monthName} ${month.year} (${month.dates.length} fechas)`);
-          month.dates.forEach(date => {
-            console.log(`     - ${date.date}: ${date.count} órdenes`);
-          });
+      data.monthsWithOrders.forEach((month, index) => {
+        console.log(`     Mes ${index + 1}: ${month.monthName} ${month.year} (${month.dates.length} fechas)`);
+        month.dates.forEach(date => {
+          console.log(`       - ${date.date}: ${date.count} órdenes`);
         });
-        
-        console.log('6. ✅ CALENDARIO: El sistema funciona correctamente!');
-        console.log('   - API responde correctamente');
-        console.log('   - Datos están estructurados correctamente');
-        console.log('   - useEffect debería ejecutarse cuando activeTab === "orders"');
-        
-        return true;
-      } else {
-        console.log('5. ❌ No hay datos en la respuesta');
-        return false;
-      }
+      });
+      
+      return data.monthsWithOrders;
     } else {
-      console.log('4. ❌ Error en la respuesta:', response.status);
-      return false;
+      console.log('   ❌ Error en la respuesta:', response.status);
+      return null;
     }
   } catch (error) {
-    console.log('4. ❌ Error en la llamada:', error.message);
-    return false;
+    console.log('   ❌ Error en la llamada:', error.message);
+    return null;
   }
 }
 
-// Ejecutar test
-testFetchOrderDates().then(success => {
-  if (success) {
-    console.log('\n🎉 CONCLUSIÓN: El sistema de calendario está funcionando correctamente!');
-    console.log('💡 Para verificar en la UI:');
-    console.log('   1. Ir a http://localhost:3000/admin');
-    console.log('   2. Hacer clic en la pestaña "Orders"');
-    console.log('   3. El calendario debería mostrar las fechas con órdenes');
-  } else {
-    console.log('\n❌ CONCLUSIÓN: Hay problemas con el sistema de calendario');
+// Test 2: Probar cargar órdenes por fecha específica
+async function testFetchOrdersForDate(date) {
+  console.log(`\n2. Probando fetchOrders para fecha: ${date}...`);
+  
+  try {
+    const response = await fetch(`http://localhost:3000/api/admin/orders?date=${date}`);
+    console.log('   Response status:', response.status);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('   ✅ Órdenes encontradas:', data.orders.length);
+      
+      data.orders.forEach((order, index) => {
+        console.log(`     Orden ${index + 1}: #${order.number}`);
+        console.log(`       Fecha: ${new Date(order.businessDate).toISOString()}`);
+        console.log(`       Total: $${order.total}`);
+        console.log(`       Items: ${order.items.length}`);
+        
+        order.items.forEach(item => {
+          console.log(`         - ${item.qty}x ${item.product?.name || 'Sin nombre'} ($${item.unitPrice} c/u = $${item.lineTotal})`);
+        });
+      });
+      
+      return data.orders;
+    } else {
+      console.log('   ❌ Error en la respuesta:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.log('   ❌ Error en la llamada:', error.message);
+    return null;
   }
-});
+}
+
+// Ejecutar tests
+(async function runTests() {
+  const dates = await testFetchOrderDates();
+  
+  if (dates && dates.length > 0) {
+    // Probar con la primera fecha disponible
+    const firstDate = dates[0].dates[0].date;
+    await testFetchOrdersForDate(firstDate);
+    
+    // Probar con otra fecha si está disponible
+    if (dates[0].dates.length > 1) {
+      const secondDate = dates[0].dates[1].date;
+      await testFetchOrdersForDate(secondDate);
+    }
+  }
+  
+  console.log('\n🔍 RESUMEN DE PRUEBAS:');
+  console.log('   Si ves las órdenes correctas para cada fecha, el problema está resuelto.');
+  console.log('   Si los totales son correctos (2x$6.00 = $12.00), el cálculo está arreglado.');
+})();

@@ -127,28 +127,9 @@ export default function AdminPage() {
   const [ordersError, setOrdersError] = React.useState<string | null>(null);
   const [orderFilters, setOrderFilters] = React.useState({
     status: 'all',
-    date: new Date().toISOString().split('T')[0],
-    search: ''
+    date: ''
   });
   const [expandedOrderId, setExpandedOrderId] = React.useState<string | null>(null);
-  
-  // Estados para el calendario de pedidos
-  interface MonthWithOrders {
-    monthKey: string;
-    monthName: string;
-    year: number;
-    month: number;
-    dates: Array<{
-      date: string;
-      count: number;
-      fullDate: Date;
-    }>;
-  }
-  
-  const [monthsWithOrders, setMonthsWithOrders] = React.useState<MonthWithOrders[]>([]);
-  const [selectedMonth, setSelectedMonth] = React.useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
-  const [datesLoading, setDatesLoading] = React.useState(false);
 
   // Products state
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -275,7 +256,6 @@ export default function AdminPage() {
       const params = new URLSearchParams();
       if (orderFilters.status !== 'all') params.append('status', orderFilters.status);
       if (orderFilters.date) params.append('date', orderFilters.date);
-      if (orderFilters.search) params.append('search', orderFilters.search);
       
       const response = await fetch(`/api/admin/orders?${params}`);
       if (!response.ok) throw new Error('Error al obtener pedidos');
@@ -289,29 +269,6 @@ export default function AdminPage() {
       setOrdersLoading(false);
     }
   }, [orderFilters]);
-
-  // Función para cargar las fechas con pedidos
-  const fetchOrderDates = React.useCallback(async () => {
-    console.log('fetchOrderDates called');
-    try {
-      setDatesLoading(true);
-      const response = await fetch('/api/admin/orders/dates');
-      if (!response.ok) throw new Error('Error al obtener fechas');
-      
-      const data = await response.json();
-      console.log('Dates data received:', data);
-      setMonthsWithOrders(data.monthsWithOrders);
-      
-      // Seleccionar el mes más reciente por defecto
-      if (data.monthsWithOrders.length > 0 && !selectedMonth) {
-        setSelectedMonth(data.monthsWithOrders[0].monthKey);
-      }
-    } catch (err) {
-      console.error('Error fetching order dates:', err);
-    } finally {
-      setDatesLoading(false);
-    }
-  }, [selectedMonth]);
 
   const fetchProducts = React.useCallback(async () => {
     try {
@@ -867,51 +824,7 @@ export default function AdminPage() {
     return () => clearInterval(interval);
   }, [loadStats, loadStatsSilent]);
 
-  React.useEffect(() => {
-    console.log('Effect for orders dates triggered, activeTab:', activeTab);
-    if (activeTab === 'orders') {
-      console.log('About to call fetchOrderDates');
-      
-      // Función para cargar las fechas con pedidos
-      const loadOrderDates = async () => {
-        console.log('loadOrderDates called');
-        try {
-          setDatesLoading(true);
-          const response = await fetch('/api/admin/orders/dates');
-          if (!response.ok) throw new Error('Error al obtener fechas');
-          
-          const data = await response.json();
-          console.log('Dates data received:', data);
-          setMonthsWithOrders(data.monthsWithOrders);
-          
-          // Seleccionar el mes más reciente por defecto
-          if (data.monthsWithOrders.length > 0 && !selectedMonth) {
-            setSelectedMonth(data.monthsWithOrders[0].monthKey);
-          }
-        } catch (err) {
-          console.error('Error fetching order dates:', err);
-        } finally {
-          setDatesLoading(false);
-        }
-      };
-      
-      loadOrderDates();
-    }
-  }, [activeTab, selectedMonth]);
 
-  React.useEffect(() => {
-    if (activeTab === 'orders' && selectedDate) {
-      // Actualizar filtros cuando se selecciona una fecha
-      setOrderFilters(prev => ({ ...prev, date: selectedDate }));
-    }
-  }, [selectedDate, activeTab]);
-
-  // Cargar pedidos cuando cambian los filtros
-  React.useEffect(() => {
-    if (activeTab === 'orders' && selectedDate) {
-      fetchOrders();
-    }
-  }, [activeTab, selectedDate, orderFilters, fetchOrders]);
 
   React.useEffect(() => {
     if (activeTab === 'products') {
@@ -919,6 +832,13 @@ export default function AdminPage() {
       fetchCategories();
     }
   }, [activeTab, fetchCategories]);
+
+  // Cargar pedidos cuando se activa el tab de orders
+  React.useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchOrders().catch(console.error);
+    }
+  }, [activeTab, fetchOrders]);
 
   // Efecto separado para productos cuando cambia la categoría seleccionada
   React.useEffect(() => {
@@ -1275,220 +1195,64 @@ export default function AdminPage() {
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="space-y-8">
-            {/* Navegación de calendario */}
-            {!selectedDate ? (
-              <div>
-                {/* Botón de debug */}
-                <div className="mb-4">
-                  <button
-                    onClick={() => fetchOrderDates()}
-                    className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
+            {/* Filtros */}
+            <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-6 border border-white/20">
+              <h3 className="text-xl font-bold mb-4 text-white">🔍 Filtros</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/80">Estado:</label>
+                  <select
+                    value={orderFilters.status}
+                    onChange={(e) => setOrderFilters(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors"
                   >
-                    🔄 Cargar Fechas
+                    <option value="all" className="bg-[#2A3441] text-white">🌟 Todos los Estados</option>
+                    <option value="IN_KITCHEN" className="bg-[#2A3441] text-white">🍳 En Cocina</option>
+                    <option value="READY" className="bg-[#2A3441] text-white">✅ Listo</option>
+                    <option value="DELIVERED" className="bg-[#2A3441] text-white">🚚 Entregado</option>
+                    <option value="CANCELLED" className="bg-[#2A3441] text-white">❌ Cancelado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/80">📅 Fecha:</label>
+                  <input
+                    type="date"
+                    value={orderFilters.date}
+                    onChange={(e) => setOrderFilters(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors [color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={() => setOrderFilters(prev => ({ ...prev, status: 'all', date: '' }))}
+                    className="w-full px-4 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors"
+                  >
+                    🧹 Limpiar Filtros
                   </button>
-                  <span className="ml-4 text-white/60">
-                    Debug: {monthsWithOrders.length} meses encontrados
-                  </span>
                 </div>
-
-                {datesLoading ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
-                    <p className="text-white/60 text-lg">Cargando fechas...</p>
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {monthsWithOrders.map((monthData) => (
-                      <div key={monthData.monthKey} className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-8 border border-white/20">
-                        {/* Header del mes */}
-                        <div className="text-center mb-8">
-                          <h2 className="text-4xl font-bold text-white mb-2">{monthData.monthName} {monthData.year}</h2>
-                          <p className="text-white/60 text-lg">
-                            {monthData.dates.reduce((sum, date) => sum + date.count, 0)} pedidos en {monthData.dates.length} día{monthData.dates.length !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-
-                        {/* Grid de fechas */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-4">
-                          {monthData.dates.map((dateInfo) => {
-                            const date = new Date(dateInfo.date);
-                            const dayNumber = date.getDate();
-                            const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' });
-                            
-                            return (
-                              <button
-                                key={dateInfo.date}
-                                onClick={() => setSelectedDate(dateInfo.date)}
-                                className="group relative rounded-2xl bg-gradient-to-br from-[#8DFF50]/10 to-[#7DE040]/10 border border-[#8DFF50]/30 p-6 hover:from-[#8DFF50]/20 hover:to-[#7DE040]/20 hover:border-[#8DFF50]/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[#8DFF50]/20"
-                              >
-                                <div className="text-center">
-                                  <div className="text-3xl font-bold text-white mb-1">{dayNumber}</div>
-                                  <div className="text-sm text-white/60 capitalize mb-2">{dayName}</div>
-                                  <div className="text-xs bg-[#8DFF50]/20 text-[#8DFF50] px-2 py-1 rounded-full">
-                                    {dateInfo.count} pedido{dateInfo.count !== 1 ? 's' : ''}
-                                  </div>
-                                </div>
-                                
-                                {/* Efecto hover */}
-                                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#8DFF50]/5 to-[#7DE040]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-
-                    {monthsWithOrders.length === 0 && !datesLoading && (
-                      <div className="text-center py-16">
-                        <div className="text-8xl mb-4">📅</div>
-                        <h3 className="text-2xl font-bold text-white mb-2">No hay pedidos</h3>
-                        <p className="text-white/60">Aún no se han registrado pedidos en el sistema</p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-            ) : (
-              /* Vista de pedidos para fecha seleccionada */
-              <div className="space-y-6">
-                {/* Header con botón de regreso */}
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setSelectedDate(null)}
-                      className="px-4 py-2 rounded-2xl bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                      </svg>
-                      Volver al calendario
-                    </button>
-                    <div>
-                      <h2 className="text-3xl font-bold text-white">
-                        Pedidos del {new Date(selectedDate).toLocaleDateString('es-ES', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric',
-                          weekday: 'long'
-                        })}
-                      </h2>
-                      <p className="text-white/60">
-                        {orders.length} pedido{orders.length !== 1 ? 's' : ''} encontrado{orders.length !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
+            </div>
+
+            {ordersLoading && (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
+                <p className="text-white/60 text-lg">Cargando pedidos...</p>
+              </div>
+            )}
+
+            {ordersError && (
+              <div className="rounded-3xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 p-6 text-red-200 flex items-center gap-4">
+                <span className="text-3xl">⚠️</span>
+                <div>
+                  <h3 className="font-bold mb-1">Error al cargar pedidos</h3>
+                  <p>{ordersError}</p>
                 </div>
+              </div>
+            )}
 
-                {/* Estadísticas del día */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="rounded-3xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-blue-500/30 flex items-center justify-center">
-                        <span className="text-3xl">📋</span>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold text-white">{orders.length}</div>
-                        <div className="text-blue-200">Total Pedidos</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="rounded-3xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30 p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-orange-500/30 flex items-center justify-center">
-                        <span className="text-3xl">🍳</span>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'IN_KITCHEN').length}</div>
-                        <div className="text-orange-200">En Cocina</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="rounded-3xl bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-green-500/30 flex items-center justify-center">
-                        <span className="text-3xl">✅</span>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'READY').length}</div>
-                        <div className="text-green-200">Listos</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="rounded-3xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-purple-500/30 flex items-center justify-center">
-                        <span className="text-3xl">💰</span>
-                      </div>
-                      <div>
-                        <div className="text-3xl font-bold text-white">{fmt(orders.reduce((sum, o) => sum + o.total, 0))}</div>
-                        <div className="text-purple-200">Total Ventas</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filtros */}
-                <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-6 border border-white/20">
-                  <h3 className="text-xl font-bold mb-4 text-white">🔍 Filtros</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-white/80">Estado:</label>
-                      <select
-                        value={orderFilters.status}
-                        onChange={(e) => setOrderFilters(prev => ({ ...prev, status: e.target.value }))}
-                        className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors"
-                      >
-                        <option value="all" className="bg-[#2A3441] text-white">🌟 Todos los Estados</option>
-                        <option value="IN_KITCHEN" className="bg-[#2A3441] text-white">🍳 En Cocina</option>
-                        <option value="READY" className="bg-[#2A3441] text-white">✅ Listo</option>
-                        <option value="DELIVERED" className="bg-[#2A3441] text-white">🚚 Entregado</option>
-                        <option value="CANCELLED" className="bg-[#2A3441] text-white">❌ Cancelado</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-white/80">Buscar por número:</label>
-                      <input
-                        type="text"
-                        placeholder="Ej: 123"
-                        value={orderFilters.search || ''}
-                        onChange={(e) => setOrderFilters(prev => ({ ...prev, search: e.target.value }))}
-                        className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:border-[#8DFF50] focus:outline-none"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        onClick={() => setOrderFilters(prev => ({ ...prev, status: 'all', search: '' }))}
-                        className="w-full px-4 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors"
-                      >
-                        🧹 Limpiar Filtros
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {ordersLoading && (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
-                    <p className="text-white/60 text-lg">Cargando pedidos...</p>
-                  </div>
-                )}
-
-                {ordersError && (
-                  <div className="rounded-3xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 p-6 text-red-200 flex items-center gap-4">
-                    <span className="text-3xl">⚠️</span>
-                    <div>
-                      <h3 className="font-bold mb-1">Error al cargar pedidos</h3>
-                      <p>{ordersError}</p>
-                    </div>
-                  </div>
-                )}
-
-                {!ordersLoading && !ordersError && (
-                  <div className="space-y-4">
-                    {orders.map((order) => {
+            {!ordersLoading && !ordersError && (
+              <div className="space-y-4">
+                {orders.map((order) => {
                       const isExpanded = expandedOrderId === order.id;
                       return (
                         <div key={order.id} className="group rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 hover:border-[#8DFF50]/50 transition-all duration-300 overflow-hidden">
@@ -1636,13 +1400,11 @@ export default function AdminPage() {
                       <div className="text-center py-16">
                         <div className="text-8xl mb-4">📋</div>
                         <h3 className="text-2xl font-bold text-white mb-2">No hay pedidos</h3>
-                        <p className="text-white/60">No se encontraron pedidos para esta fecha con los filtros seleccionados</p>
+                        <p className="text-white/60">No se encontraron pedidos con los filtros seleccionados</p>
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
           </div>
         )}
 
