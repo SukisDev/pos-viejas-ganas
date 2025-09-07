@@ -70,7 +70,7 @@ export default function HomePage() {
       </div>
 
       {/* Contenido principal */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-[100svh] px-4 py-8">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-[100svh] px-4 py-4">
         {loading ? (
           /* Loading State */
           <div className="text-center">
@@ -82,9 +82,9 @@ export default function HomePage() {
           </div>
         ) : !me ? (
           /* Estado sin sesión - Landing Page */
-          <div className="w-full max-w-6xl mb-20">
+          <div className="w-full max-w-6xl">
             {/* Header con logo */}
-            <div className="text-center mb-12 lg:mb-16 animate-fade-in">
+            <div className="text-center mb-8 lg:mb-12 animate-fade-in">
               <div className="inline-flex items-center justify-center w-24 h-24 lg:w-32 lg:h-32 mb-6 lg:mb-8 bg-white/10 backdrop-blur-sm rounded-full shadow-2xl border border-white/20">
                 <Image 
                   src="/img/logo_viejas-ganas.png" 
@@ -97,63 +97,64 @@ export default function HomePage() {
               <h1 className="text-4xl lg:text-6xl font-bold bg-gradient-to-r from-[#8DFF50] to-[#7DE040] bg-clip-text text-transparent mb-4">
                 Viejas Ganas
               </h1>
-              <p className="text-xl lg:text-2xl text-gray-300 mb-4">Sistema de Punto de Venta</p>
-              <p className="text-base lg:text-lg text-gray-400 max-w-2xl mx-auto px-4">
+              <p className="text-xl lg:text-2xl text-gray-300 mb-6">Sistema de Punto de Venta</p>
+              
+              {/* Botón de acceso principal - justo debajo del subtítulo */}
+              <div className="mb-8 lg:mb-12">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-3 px-8 lg:px-12 py-3 lg:py-4 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] hover:from-[#7DE040] hover:to-[#6DD030] text-[#1D263B] font-bold text-lg lg:text-xl rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-2xl hover:shadow-[#8DFF50]/25"
+                >
+                  <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
+                  Acceder al Sistema
+                </Link>
+              </div>
+
+              <p className="text-sm lg:text-base text-gray-400 max-w-2xl mx-auto px-4 mb-8">
                 Bienvenido al sistema de gestión integral para tu restaurante. 
                 Aquí podrás administrar pedidos, supervisar la cocina y gestionar tu negocio 
                 de forma eficiente y organizada.
               </p>
             </div>
 
-            {/* Características del sistema */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-12 lg:mb-16 px-4">
-              <div className="group p-6 lg:p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#8DFF50]/30 transition-all duration-300 hover:shadow-2xl hover:shadow-[#8DFF50]/10 hover:scale-105">
-                <div className="w-14 h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-2xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-7 h-7 lg:w-8 lg:h-8 text-[#1D263B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Características del sistema - más compactas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 px-4">
+              <div className="group p-4 lg:p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#8DFF50]/30 transition-all duration-300 hover:shadow-xl hover:shadow-[#8DFF50]/10 hover:scale-105">
+                <div className="w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl flex items-center justify-center mb-3 lg:mb-4 group-hover:scale-110 transition-transform duration-300 mx-auto">
+                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-[#1D263B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h3 className="text-lg lg:text-xl font-bold text-white mb-3">Punto de Venta</h3>
-                <p className="text-sm lg:text-base text-gray-400">Registra pedidos y procesa transacciones de manera rápida y sencilla.</p>
+                <h3 className="text-lg font-bold text-white mb-2 text-center">Punto de Venta</h3>
+                <p className="text-sm text-gray-400 text-center">Registra pedidos y procesa transacciones de manera rápida y sencilla.</p>
               </div>
 
-              <div className="group p-6 lg:p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#8DFF50]/30 transition-all duration-300 hover:shadow-2xl hover:shadow-[#8DFF50]/10 hover:scale-105">
-                <div className="w-14 h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-2xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-7 h-7 lg:w-8 lg:h-8 text-[#1D263B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="group p-4 lg:p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#8DFF50]/30 transition-all duration-300 hover:shadow-xl hover:shadow-[#8DFF50]/10 hover:scale-105">
+                <div className="w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl flex items-center justify-center mb-3 lg:mb-4 group-hover:scale-110 transition-transform duration-300 mx-auto">
+                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-[#1D263B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
                   </svg>
                 </div>
-                <h3 className="text-lg lg:text-xl font-bold text-white mb-3">Gestión de Cocina</h3>
-                <p className="text-sm lg:text-base text-gray-400">Visualiza y administra todos los pedidos pendientes desde la cocina.</p>
+                <h3 className="text-lg font-bold text-white mb-2 text-center">Gestión de Cocina</h3>
+                <p className="text-sm text-gray-400 text-center">Visualiza y administra todos los pedidos pendientes desde la cocina.</p>
               </div>
 
-              <div className="group p-6 lg:p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#8DFF50]/30 transition-all duration-300 hover:shadow-2xl hover:shadow-[#8DFF50]/10 hover:scale-105">
-                <div className="w-14 h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-2xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <svg className="w-7 h-7 lg:w-8 lg:h-8 text-[#1D263B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="group p-4 lg:p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#8DFF50]/30 transition-all duration-300 hover:shadow-xl hover:shadow-[#8DFF50]/10 hover:scale-105">
+                <div className="w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl flex items-center justify-center mb-3 lg:mb-4 group-hover:scale-110 transition-transform duration-300 mx-auto">
+                  <svg className="w-6 h-6 lg:w-7 lg:h-7 text-[#1D263B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z" />
                   </svg>
                 </div>
-                <h3 className="text-lg lg:text-xl font-bold text-white mb-3">Panel Administrativo</h3>
-                <p className="text-sm lg:text-base text-gray-400">Administra usuarios, productos y consulta reportes de tu negocio.</p>
+                <h3 className="text-lg font-bold text-white mb-2 text-center">Panel Administrativo</h3>
+                <p className="text-sm text-gray-400 text-center">Administra usuarios, productos y consulta reportes de tu negocio.</p>
               </div>
-            </div>
-
-            {/* Botón de acceso principal */}
-            <div className="text-center px-4">
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-3 px-8 lg:px-12 py-3 lg:py-4 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] hover:from-[#7DE040] hover:to-[#6DD030] text-[#1D263B] font-bold text-lg lg:text-xl rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-2xl hover:shadow-[#8DFF50]/25"
-              >
-                <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                </svg>
-                Acceder al Sistema
-              </Link>
             </div>
           </div>
         ) : (
           /* Estado con sesión - Dashboard */
-          <div className="w-full max-w-6xl mb-20">
+          <div className="w-full max-w-6xl mb-16">
             {/* Header del usuario */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 lg:mb-12 animate-fade-in gap-4 px-4">
               <div className="flex items-center gap-4 lg:gap-6">

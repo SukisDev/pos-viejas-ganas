@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-type Role = 'ADMIN' | 'CASHIER' | 'CHEF';
-
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState<string>('');
@@ -14,16 +12,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  // Si ya hay sesión válida, redirige a /cashier (ADMIN y CASHIER pasan; CHEF será a /kitchen)
+  // Si ya hay sesión válida, redirige a la página principal
   useEffect(() => {
     let abort = false;
     (async () => {
       try {
         const res = await fetch('/api/auth/me', { cache: 'no-store' });
         if (!abort && res.ok) {
-          const me = (await res.json()) as { role: Role };
-          if (me.role === 'CHEF') router.replace('/kitchen');
-          else if (me.role === 'ADMIN' || me.role === 'CASHIER') router.replace('/cashier');
+          // Todos los usuarios autenticados van a la página principal
+          router.replace('/');
         }
       } catch {
         /* ignorar */
@@ -46,16 +43,8 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        // Usamos el rol del response para decidir a dónde ir
-        const data = (await res.json()) as { role: Role };
-        if (data.role === 'CHEF') {
-          router.replace('/kitchen');
-        } else if (data.role === 'ADMIN' || data.role === 'CASHIER') {
-          router.replace('/cashier');
-        } else {
-          // fallback seguro
-          router.replace('/login');
-        }
+        // Todos los usuarios van a la página principal donde verán su dashboard personalizado
+        router.replace('/');
         return;
       }
 
