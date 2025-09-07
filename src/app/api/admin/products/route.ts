@@ -100,19 +100,36 @@ export async function GET(request: Request) {
         category: true,
         price: true,
         active: true,
-        createdAt: true,
-        _count: {
-          select: {
-            orderItems: true
-          }
-        }
-      }
+        createdAt: true
+      },
+      take: 200 // Limitar resultados para mejor rendimiento
     });
+
+    // Obtener conteos de manera más eficiente solo si hay pocos productos
+    const productIds = products.map(p => p.id);
+    const orderCounts = productIds.length <= 50 ? await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        productId: {
+          in: productIds
+        }
+      },
+      _count: {
+        productId: true
+      }
+    }) : [];
+
+    const orderCountMap = orderCounts.reduce((acc, item) => {
+      if (item.productId) {
+        acc[item.productId] = item._count.productId;
+      }
+      return acc;
+    }, {} as Record<string, number>);
 
     const result = products.map(product => ({
       ...product,
       price: Number(product.price),
-      orderCount: product._count.orderItems,
+      orderCount: orderCountMap[product.id] || 0,
       isActive: product.active
     }));
 

@@ -272,15 +272,23 @@ export default function AdminPage() {
   const fetchProducts = React.useCallback(async () => {
     try {
       setProductsLoading(true);
+      setProductsError(null);
+      
       const params = new URLSearchParams();
       if (selectedCategory) params.append('category', selectedCategory);
       
-      const response = await fetch(`/api/admin/products?${params}`);
+      const response = await fetch(`/api/admin/products?${params}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
       if (!response.ok) throw new Error('Error al obtener productos');
       
       const data = await response.json();
       setProducts(data);
-      setProductsError(null);
+      
     } catch (err) {
       setProductsError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -290,15 +298,25 @@ export default function AdminPage() {
 
   const fetchCategories = React.useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/categories');
+      const response = await fetch('/api/admin/categories', {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
       if (!response.ok) throw new Error('Error al obtener categorías');
       
       const data = await response.json();
       setCategories(data);
+      
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
   }, []);
+
+  // Función para forzar recarga de categorías (simplificada)
+  const refreshCategories = React.useCallback(fetchCategories, [fetchCategories]);
 
   const fetchUsers = React.useCallback(async () => {
     try {
@@ -366,7 +384,7 @@ export default function AdminPage() {
       
       setProductForm({ name: '', category: '', price: '' });
       fetchProducts();
-      fetchCategories(); // Actualizar categorías también
+      refreshCategories(); // Actualizar categorías también
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Error desconocido');
     }
@@ -406,7 +424,7 @@ export default function AdminPage() {
       showSuccessMessage(`Categoría "${newCategoryName.trim()}" creada exitosamente`);
       setShowCategoryForm(false);
       setNewCategoryName('');
-      fetchCategories();
+      refreshCategories();
     } catch (err) {
       showSuccessMessage(err instanceof Error ? err.message : 'Error desconocido', true);
     }
@@ -443,7 +461,7 @@ export default function AdminPage() {
       setShowCategoryForm(false);
       setEditingCategory(null);
       setNewCategoryName('');
-      fetchCategories();
+      refreshCategories();
       
       // Si estamos viendo productos de esta categoría, actualizar la vista
       if (selectedCategory === editingCategory.name) {
@@ -497,7 +515,7 @@ export default function AdminPage() {
       }
 
       showSuccessMessage('Categoría eliminada exitosamente');
-      fetchCategories();
+      refreshCategories();
       setShowDeleteCategoryModal(false);
       setCategoryToDelete(null);
       setDeleteTargetCategory('');
@@ -571,7 +589,7 @@ export default function AdminPage() {
       setShowDeleteProductModal(false);
       setProductToDelete(null);
       fetchProducts();
-      fetchCategories();
+      refreshCategories();
     } catch (err) {
       showSuccessMessage(err instanceof Error ? err.message : 'Error desconocido', true);
     }
@@ -813,31 +831,23 @@ export default function AdminPage() {
 
   React.useEffect(() => {
     if (activeTab === 'products') {
+      // Cargar categorías solo una vez al entrar
       fetchCategories();
-      if (selectedCategory) {
-        fetchProducts();
-      }
     }
-  }, [activeTab, fetchCategories, fetchProducts, selectedCategory]);
+  }, [activeTab, fetchCategories]);
+
+  // Efecto separado para productos cuando cambia la categoría seleccionada
+  React.useEffect(() => {
+    if (activeTab === 'products' && selectedCategory) {
+      fetchProducts();
+    }
+  }, [activeTab, selectedCategory, fetchProducts]);
 
   React.useEffect(() => {
     if (activeTab === 'users') {
       fetchUsers();
     }
   }, [activeTab, fetchUsers]);
-
-  // Separate effects for filter changes
-  React.useEffect(() => {
-    if (activeTab === 'orders') {
-      fetchOrders();
-    }
-  }, [activeTab, fetchOrders]); // This will refetch when filters change
-
-  React.useEffect(() => {
-    if (activeTab === 'products') {
-      fetchProducts();
-    }
-  }, [activeTab, fetchProducts]); // This will refetch when filter changes
 
   // Bloquear scroll cuando hay modales abiertos
   React.useEffect(() => {
@@ -855,13 +865,13 @@ export default function AdminPage() {
     };
   }, [showProductForm, showCategoryForm, showMoveProductModal, showUserForm, showConfirmModal, showDeleteCategoryModal, showSuccessModal, showDeleteProductModal, showProductCreatedModal]);
 
-  // Polling automático ultra rápido y silencioso para el dashboard
+  // Polling optimizado - menos frecuente para mejor rendimiento
   React.useEffect(() => {
     if (activeTab !== 'dashboard') return;
 
     const interval = setInterval(() => {
       loadStatsSilent();
-    }, 15000); // Actualizar cada 15 segundos - más frecuente para datos en tiempo real
+    }, 60000); // Actualizar cada 60 segundos - más eficiente
 
     return () => clearInterval(interval);
   }, [activeTab, loadStatsSilent]);
@@ -879,10 +889,6 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-[100svh] bg-gradient-to-br from-[#0A0E1A] via-[#1D263B] to-[#2A3441] text-white relative overflow-hidden">
-      {/* Fondo animado sutil */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#8DFF50]/5 via-transparent to-[#8DFF50]/10 animate-pulse"></div>
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#8DFF50]/10 via-transparent to-transparent"></div>
-      
       {/* Header Ultra Moderno */}
       <header className="relative z-10 bg-gradient-to-r from-black/40 via-black/20 to-black/40 backdrop-blur-2xl border-b border-white/10 shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/5 via-transparent to-[#8DFF50]/5"></div>
@@ -902,10 +908,6 @@ export default function AdminPage() {
                 <h1 className="text-4xl font-black bg-gradient-to-r from-white via-[#8DFF50] to-white bg-clip-text text-transparent leading-tight">
                   Panel Admin
                 </h1>
-                <div className="flex items-center gap-3 mt-1">
-                  <div className="w-2 h-2 bg-[#8DFF50] rounded-full animate-pulse"></div>
-                  <p className="text-lg font-semibold text-[#8DFF50]">Control Total del Sistema</p>
-                </div>
               </div>
             </div>
 
@@ -914,12 +916,10 @@ export default function AdminPage() {
               {/* Botón regresar al menú principal */}
               <Link 
                 href="/"
-                className="group relative px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-500/30 backdrop-blur-xl transition-all duration-300"
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-500/30 backdrop-blur-xl"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 to-blue-400/0 group-hover:from-blue-400/10 group-hover:to-blue-400/5 rounded-2xl transition-all duration-300"></div>
-                
-                <div className="relative flex items-center gap-3">
-                  <div className="w-5 h-5 transition-all duration-300 group-hover:-translate-x-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
@@ -930,60 +930,51 @@ export default function AdminPage() {
                 </div>
               </Link>
 
-              {/* Botón actualizar súper premium */}
+              {/* Botón actualizar optimizado */}
               {activeTab === 'dashboard' && (
                 <button 
                   onClick={loadStats}
                   disabled={dashboardLoading}
-                  className={`group relative px-6 py-3 rounded-2xl bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 border border-white/20 backdrop-blur-xl transition-all duration-300 ${dashboardLoading ? 'from-[var(--brand)]/30 to-[var(--brand)]/20 scale-95 border-[var(--brand)]/50' : ''}`}
+                  className={`px-6 py-3 rounded-2xl bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 border border-white/20 backdrop-blur-xl ${dashboardLoading ? 'from-[var(--brand)]/30 to-[var(--brand)]/20 border-[var(--brand)]/50' : ''}`}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/0 to-[#8DFF50]/0 group-hover:from-[#8DFF50]/10 group-hover:to-[#8DFF50]/5 rounded-2xl transition-all duration-300"></div>
-                  
-                  <div className="relative flex items-center gap-3">
-                    <div className={`w-5 h-5 transition-all duration-300 ${dashboardLoading ? 'animate-spin text-[var(--brand)]' : 'group-hover:rotate-180'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 ${dashboardLoading ? 'animate-spin text-[var(--brand)]' : ''}`}>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     </div>
-                    <span className={`font-bold text-base transition-colors duration-300 ${dashboardLoading ? 'text-[var(--brand)]' : ''}`}>
+                    <span className={`font-bold text-base ${dashboardLoading ? 'text-[var(--brand)]' : ''}`}>
                       {dashboardLoading ? 'Actualizando...' : 'Actualizar'}
                     </span>
                   </div>
                 </button>
               )}
               
-              {/* Perfil de usuario ultra premium */}
+              {/* Perfil de usuario optimizado */}
               {currentUser && (
-                <div className="group relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/20 to-[#7DE040]/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  <div className="relative flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-white/15 to-white/5 border border-white/20 backdrop-blur-2xl shadow-2xl">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl blur-sm"></div>
-                      <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-black text-lg shadow-lg">
-                        {currentUser.username.charAt(0).toUpperCase()}
-                      </div>
+                <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-white/15 to-white/5 border border-white/20 backdrop-blur-2xl shadow-2xl">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl blur-sm"></div>
+                    <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-black text-lg shadow-lg">
+                      {currentUser.username.charAt(0).toUpperCase()}
                     </div>
-                    
-                    <div>
-                      <div className="font-bold text-base text-white">@{currentUser.username}</div>
-                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-bold ${ROLE_COLORS[currentUser.role]} shadow-lg`}>
-                        <span className="text-sm">
-                          {currentUser.role === 'ADMIN' ? '👑' : currentUser.role === 'CHEF' ? '👨‍🍳' : '💳'}
-                        </span>
-                        {ROLE_LABELS[currentUser.role]}
-                      </div>
+                  </div>
+                  
+                  <div>
+                    <div className="font-bold text-base text-white">@{currentUser.username}</div>
+                    <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-bold ${ROLE_COLORS[currentUser.role]} shadow-lg`}>
+                      <span className="text-sm">
+                        {currentUser.role === 'ADMIN' ? '👑' : currentUser.role === 'CHEF' ? '👨‍🍳' : '💳'}
+                      </span>
+                      {ROLE_LABELS[currentUser.role]}
                     </div>
                   </div>
                 </div>
               )}
               
-              {/* Botón salir premium */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-red-600/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative">
-                  <LogoutButton />
-                </div>
+              {/* Botón salir optimizado */}
+              <div className="relative">
+                <LogoutButton />
               </div>
             </div>
           </div>
@@ -1006,18 +997,14 @@ export default function AdminPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`group relative px-6 py-3 rounded-xl font-bold text-base transition-all duration-300 whitespace-nowrap ${
+                className={`px-6 py-3 rounded-xl font-bold text-base whitespace-nowrap ${
                   activeTab === tab.id 
-                    ? 'bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] transform scale-105 shadow-2xl' 
+                    ? 'bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] shadow-lg' 
                     : 'bg-gradient-to-r from-white/10 to-white/5 text-white hover:from-white/20 hover:to-white/10 border border-white/10'
                 }`}
               >
-                {activeTab === tab.id && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/50 to-[#7DE040]/50 rounded-xl blur-xl"></div>
-                )}
-                
-                <div className="relative flex items-center gap-2">
-                  <span className={`text-xl transition-transform duration-300 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">
                     {tab.icon}
                   </span>
                   <span className="hidden sm:inline font-black tracking-wide">
@@ -1046,17 +1033,14 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Loading state optimizado - solo para el contenido */}
+            {/* Loading state optimizado y simple */}
             {dashboardLoading && !stats && (
               <div className="space-y-6">
                 {/* Overview Cards Loading */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20 animate-pulse">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-8 h-8 bg-white/20 rounded-lg"></div>
-                        <div className="h-4 bg-white/20 rounded w-24"></div>
-                      </div>
+                    <div key={i} className="rounded-2xl bg-white/10 p-6 border border-white/20">
+                      <div className="h-4 bg-white/20 rounded w-24 mb-3"></div>
                       <div className="h-8 bg-white/20 rounded w-16 mb-2"></div>
                       <div className="h-3 bg-white/20 rounded w-20"></div>
                     </div>
@@ -1065,41 +1049,20 @@ export default function AdminPage() {
 
                 {/* Charts Loading */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20 animate-pulse">
+                  <div className="rounded-2xl bg-white/10 p-6 border border-white/20">
                     <div className="h-6 bg-white/20 rounded w-48 mb-4"></div>
                     <div className="space-y-3">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-white/20 rounded"></div>
-                            <div>
-                              <div className="h-4 bg-white/20 rounded w-32 mb-1"></div>
-                              <div className="h-3 bg-white/20 rounded w-20"></div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="h-4 bg-white/20 rounded w-12 mb-1"></div>
-                            <div className="h-3 bg-white/20 rounded w-16"></div>
-                          </div>
-                        </div>
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="h-12 bg-white/10 rounded"></div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20 animate-pulse">
+                  <div className="rounded-2xl bg-white/10 p-6 border border-white/20">
                     <div className="h-6 bg-white/20 rounded w-40 mb-4"></div>
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white/20 rounded-lg"></div>
-                            <div>
-                              <div className="h-4 bg-white/20 rounded w-28 mb-1"></div>
-                              <div className="h-3 bg-white/20 rounded w-20"></div>
-                            </div>
-                          </div>
-                          <div className="h-4 bg-white/20 rounded w-20"></div>
-                        </div>
+                    <div className="space-y-3">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="h-12 bg-white/10 rounded"></div>
                       ))}
                     </div>
                   </div>
@@ -1110,12 +1073,12 @@ export default function AdminPage() {
             {/* Contenido real cuando hay datos */}
             {stats && (
               <div className="relative">
-                {/* Indicador sutil de actualización cuando está cargando con datos existentes */}
+                {/* Indicador simple de actualización */}
                 {dashboardLoading && (
-                  <div className="absolute top-0 right-0 z-10 px-3 py-1 bg-[#8DFF50]/20 border border-[#8DFF50]/30 rounded-lg backdrop-blur-sm">
+                  <div className="absolute top-0 right-0 z-10 px-3 py-1 bg-[#8DFF50]/20 rounded-lg">
                     <div className="flex items-center gap-2 text-sm">
-                      <div className="w-3 h-3 border-2 border-[#8DFF50] border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-[#8DFF50] font-medium">Actualizando...</span>
+                      <div className="w-2 h-2 bg-[#8DFF50] rounded-full animate-pulse"></div>
+                      <span className="text-[#8DFF50] font-medium">Actualizando</span>
                     </div>
                   </div>
                 )}
@@ -1386,7 +1349,7 @@ export default function AdminPage() {
                           const result = await response.json();
                           if (response.ok) {
                             showSuccessMessage(result.message);
-                            fetchCategories();
+                            refreshCategories();
                             fetchProducts();
                           } else {
                             showSuccessMessage(result.error || 'Error en limpieza', true);
@@ -1500,9 +1463,9 @@ export default function AdminPage() {
                 </div>
 
                 {productsLoading && (
-                  <div className="text-center py-16">
-                    <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-[#8DFF50] mx-auto"></div>
-                    <p className="text-xl text-white/60 mt-6">Cargando productos...</p>
+                  <div className="text-center py-8">
+                    <div className="w-8 h-8 border-2 border-[#8DFF50] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-lg text-white/60 mt-3">Cargando productos...</p>
                   </div>
                 )}
 
