@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useAuth } from '../../hooks/useAuth';
 
 /* ========= Tipos ========= */
 type MenuItem = {
@@ -169,6 +170,9 @@ function OpenItemSheet(props: {
 
 /* ========= Página ========= */
 export default function CashierPage() {
+  // Autenticación y verificación de estado
+  const { currentUser } = useAuth();
+  
   // Datos
   const [data, setData] = React.useState<MenuResponse | null>(null);
   const [loading, setLoading] = React.useState(true);

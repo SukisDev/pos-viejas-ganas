@@ -37,12 +37,23 @@ export async function POST(req: Request) {
 
   const user = await prisma.user.findUnique({
     where: { username },
-    select: { id: true, username: true, role: true, passwordHash: true },
+    select: { 
+      id: true, 
+      username: true, 
+      role: true, 
+      passwordHash: true,
+      active: true // Agregar verificación de estado activo
+    },
   });
 
   // Respuesta genérica para no filtrar existencia de usuario
   if (!user || !user.passwordHash) {
     return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 });
+  }
+
+  // Verificar si el usuario está activo ANTES de verificar la contraseña
+  if (!user.active) {
+    return NextResponse.json({ error: 'No tienes permisos para acceder al sistema' }, { status: 403 });
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);

@@ -137,6 +137,9 @@ export async function PATCH(request: Request) {
   if ('error' in auth) return auth.error;
 
   try {
+    const requestBody = await request.json();
+    console.log('PATCH request body recibido:', requestBody);
+    
     const { userId, username, name, password, role, isActive }: {
       userId: string;
       username?: string;
@@ -144,13 +147,15 @@ export async function PATCH(request: Request) {
       password?: string;
       role?: string;
       isActive?: boolean;
-    } = await request.json();
+    } = requestBody;
 
     if (!userId) {
       return NextResponse.json({ error: 'userId requerido' }, { status: 400 });
     }
 
     const updateData: Record<string, string | boolean | null> = {};
+    
+    console.log('Valores recibidos:', { userId, username, name, password, role, isActive });
     
     if (username !== undefined) {
       const trimmedUsername = username?.trim();
@@ -174,6 +179,8 @@ export async function PATCH(request: Request) {
       }
       updateData.passwordHash = await bcrypt.hash(password, 12);
     }
+
+    console.log('updateData construido:', updateData);
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'Al menos un campo para actualizar' }, { status: 400 });

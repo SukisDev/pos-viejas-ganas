@@ -2,6 +2,7 @@
 
 import React from 'react';
 import LogoutButton from '../../components/LogoutButton';
+import { useAuth } from '../../hooks/useAuth';
 
 interface OrderItem {
   id: string;
@@ -35,6 +36,9 @@ interface KitchenOrder {
 const fmt = (n: number | string) => `$${Number(n).toFixed(2)}`;
 
 export default function KitchenPage() {
+  // Autenticación y verificación de estado
+  const { currentUser } = useAuth();
+  
   const [orders, setOrders] = React.useState<KitchenOrder[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);

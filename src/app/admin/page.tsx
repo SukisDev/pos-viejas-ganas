@@ -171,6 +171,8 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = React.useState<User | null>(null);
   const [showDeleteUserModal, setShowDeleteUserModal] = React.useState(false);
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
+  const [showToggleUserModal, setShowToggleUserModal] = React.useState(false);
+  const [userToToggle, setUserToToggle] = React.useState<User | null>(null);
   const [userForm, setUserForm] = React.useState({
     username: '',
     name: '',
@@ -655,32 +657,48 @@ export default function AdminPage() {
     setShowUserForm(true);
   };
 
-  const handleToggleUser = async (user: User) => {
+  const handleToggleUser = (user: User) => {
+    setUserToToggle(user);
+    setShowToggleUserModal(true);
+  };
+
+  const confirmToggleUser = async () => {
+    if (!userToToggle) return;
+
     try {
+      const requestBody = {
+        userId: userToToggle.id,
+        isActive: !userToToggle.isActive
+      };
+      
+      console.log('Enviando request:', requestBody);
+      
       const response = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          active: !user.isActive // Cambiado de isActive a active para coincidir con el schema
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('Error del servidor:', error);
         throw new Error(error.error || 'Error al actualizar usuario');
       }
 
+      setShowToggleUserModal(false);
+      setUserToToggle(null);
       fetchUsers();
 
       // CRÍTICO: Forzar verificación inmediata de sesiones
       broadcastSessionCheck();
       
       // Mostrar mensaje de éxito
-      const action = user.isActive ? 'desactivado' : 'activado';
-      showSuccess(`Usuario "${user.name || user.username}" ${action} exitosamente. ${user.isActive ? 'Su acceso ha sido revocado inmediatamente.' : 'Ahora puede acceder al sistema.'}`);
+      const action = userToToggle.isActive ? 'desactivado' : 'activado';
+      showSuccess(`Usuario "${userToToggle.name || userToToggle.username}" ${action} exitosamente. ${userToToggle.isActive ? 'Su acceso ha sido revocado inmediatamente.' : 'Ahora puede acceder al sistema.'}`);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Error desconocido');
+      setShowToggleUserModal(false);
+      setUserToToggle(null);
     }
   };
 
@@ -2501,6 +2519,75 @@ export default function AdminPage() {
                   className="mt-8 px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-2xl hover:from-green-600 hover:to-emerald-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
                 >
                   ¡Genial! 🚀
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmación - Activar/Desactivar Usuario */}
+        {showToggleUserModal && userToToggle && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  userToToggle.isActive ? 'bg-red-100' : 'bg-green-100'
+                }`}>
+                  {userToToggle.isActive ? (
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                </div>
+                <h3 className={`text-lg font-semibold ${
+                  userToToggle.isActive ? 'text-red-800' : 'text-green-800'
+                }`}>
+                  {userToToggle.isActive ? 'Desactivar Usuario' : 'Activar Usuario'}
+                </h3>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 mb-2">
+                  ¿Estás seguro que deseas {userToToggle.isActive ? 'desactivar' : 'activar'} al usuario:
+                </p>
+                <p className="font-semibold text-gray-900">
+                  {userToToggle.name || userToToggle.username}
+                </p>
+                {userToToggle.isActive && (
+                  <p className="text-sm text-red-600 mt-2">
+                    ⚠️ El usuario perderá acceso inmediatamente al sistema
+                  </p>
+                )}
+                {!userToToggle.isActive && (
+                  <p className="text-sm text-green-600 mt-2">
+                    ✅ El usuario podrá acceder nuevamente al sistema
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowToggleUserModal(false);
+                    setUserToToggle(null);
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-xl hover:bg-gray-300 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmToggleUser}
+                  className={`flex-1 text-white py-2 px-4 rounded-xl transition-colors ${
+                    userToToggle.isActive 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                >
+                  {userToToggle.isActive ? 'Desactivar' : 'Activar'}
                 </button>
               </div>
             </div>
