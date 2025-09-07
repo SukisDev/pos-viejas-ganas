@@ -19,11 +19,21 @@ export default function LogoutButton() {
     <button
       onClick={doLogout}
       disabled={loading}
-      className="rounded-lg bg-white/10 px-3 py-2 text-white hover:bg-white/15 disabled:opacity-60"
+      className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-300 hover:from-red-500/30 hover:to-red-600/30 hover:border-red-400/50 hover:text-red-200 disabled:opacity-60 transition-all duration-300 font-medium"
       aria-label="Cerrar sesión"
       title="Cerrar sesión"
     >
-      {loading ? 'Saliendo…' : 'Salir'}
+      {loading ? (
+        <>
+          <div className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin"></div>
+          Saliendo...
+        </>
+      ) : (
+        <>
+          <span>🚪</span>
+          Salir
+        </>
+      )}
     </button>
   );
 }

@@ -150,10 +150,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'userId requerido' }, { status: 400 });
     }
 
-    const updateData: Record<string, string | boolean> = {};
+    const updateData: Record<string, string | boolean | null> = {};
     
-    if (username !== undefined) updateData.username = username.toLowerCase().trim();
-    if (name !== undefined) updateData.name = name.trim();
+    if (username !== undefined) {
+      const trimmedUsername = username?.trim();
+      if (!trimmedUsername) {
+        return NextResponse.json({ error: 'El nombre de usuario no puede estar vacío' }, { status: 400 });
+      }
+      updateData.username = trimmedUsername.toLowerCase();
+    }
+    if (name !== undefined) updateData.name = name?.trim() || null;
     if (role !== undefined) {
       if (!['ADMIN', 'CASHIER', 'CHEF'].includes(role)) {
         return NextResponse.json({ error: 'Role inválido' }, { status: 400 });
@@ -238,35 +244,61 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta' }, { status: 409 });
     }
 
-    // Verificar si el usuario tiene pedidos asociados
-    const ordersCount = await prisma.order.count({
-      where: {
-        OR: [
-          { cashierId: userId },
-          { chefId: userId }
-        ]
+    // Verificar si existe el usuario
+    const existingUser = await prisma.user.findUnique({
+      where: { 
+        id: userId
+        // deleted: false // Comentado hasta que se aplique la migración
+      },
+      include: {
+        _count: {
+          select: {
+            ordersCreated: true,
+            ordersCompleted: true
+          }
+        }
       }
     });
 
-    if (ordersCount > 0) {
-      return NextResponse.json({ 
-        error: `No se puede eliminar. El usuario tiene ${ordersCount} pedidos asociados. Desactívalo en su lugar.` 
-      }, { status: 409 });
-    }
-
-    await prisma.user.delete({
-      where: { id: userId }
-    });
-
-    return NextResponse.json({ message: 'Usuario eliminado exitosamente' });
-
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    
-    if (errorMessage.includes('Record to delete does not exist')) {
+    if (!existingUser) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }
 
+    const totalOrders = existingUser._count.ordersCreated + existingUser._count.ordersCompleted;
+
+    // Por ahora usamos eliminación física hasta que se aplique la migración soft delete
+    // TODO: Cambiar a soft delete cuando se aplique la migración
+    try {
+      await prisma.user.delete({
+        where: { id: userId }
+      });
+    } catch (error) {
+      // Si falla por integridad referencial, desactivar el usuario en su lugar
+      console.log('Error eliminando usuario, desactivando en su lugar:', error);
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          active: false,
+          username: `_DELETED_${existingUser.username}_${Date.now()}`
+        }
+      });
+      
+      return NextResponse.json({ 
+        message: 'Usuario desactivado (tenía registros asociados)',
+        preservedOrders: totalOrders,
+        username: existingUser.username,
+        note: 'Los registros históricos del usuario se mantienen. El usuario fue desactivado en lugar de eliminado.'
+      });
+    }
+
+    return NextResponse.json({ 
+      message: 'Usuario eliminado exitosamente',
+      preservedOrders: totalOrders,
+      username: existingUser.username,
+      note: 'Los registros históricos se mantienen para auditoría'
+    });
+
+  } catch (error: unknown) {
     console.error('Error eliminando usuario:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }

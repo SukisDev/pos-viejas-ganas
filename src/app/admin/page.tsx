@@ -2,6 +2,7 @@
 
 import React from 'react';
 import LogoutButton from '../../components/LogoutButton';
+import { useAuth } from '../../hooks/useAuth';
 
 // Types
 interface DashboardStats {
@@ -111,6 +112,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function AdminPage() {
+  const { currentUser, broadcastSessionCheck } = useAuth();
   const [activeTab, setActiveTab] = React.useState<'dashboard' | 'orders' | 'products' | 'users' | 'credits'>('dashboard');
   
   // Dashboard state
@@ -163,14 +165,34 @@ export default function AdminPage() {
   const [users, setUsers] = React.useState<User[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
   const [usersError, setUsersError] = React.useState<string | null>(null);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [usersPerPage] = React.useState(10);
   const [showUserForm, setShowUserForm] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<User | null>(null);
+  const [showDeleteUserModal, setShowDeleteUserModal] = React.useState(false);
+  const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   const [userForm, setUserForm] = React.useState({
     username: '',
     name: '',
     password: '',
     role: 'CASHIER'
   });
+
+  // Modal system state
+  const [showErrorModal, setShowErrorModal] = React.useState(false);
+  const [showSuccessMessageModal, setShowSuccessMessageModal] = React.useState(false);
+  const [modalMessage, setModalMessage] = React.useState('');
+
+  // Utility functions for modal management
+  const showError = (message: string) => {
+    setModalMessage(message);
+    setShowErrorModal(true);
+  };
+
+  const showSuccess = (message: string) => {
+    setModalMessage(message);
+    setShowSuccessMessageModal(true);
+  };
 
   // Fetch functions
   const loadStats = React.useCallback(async () => {
@@ -260,13 +282,13 @@ export default function AdminPage() {
     try {
       const { name, category, price } = productForm;
       if (!name.trim() || !category.trim() || !price) {
-        alert('Todos los campos son requeridos');
+        showError('Todos los campos son requeridos');
         return;
       }
 
       const priceNum = parseFloat(price);
       if (priceNum <= 0) {
-        alert('El precio debe ser mayor a 0');
+        showError('El precio debe ser mayor a 0');
         return;
       }
 
@@ -307,7 +329,7 @@ export default function AdminPage() {
       fetchProducts();
       fetchCategories(); // Actualizar categorías también
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error desconocido');
+      showError(err instanceof Error ? err.message : 'Error desconocido');
     }
   };
 
@@ -327,7 +349,7 @@ export default function AdminPage() {
   const handleCreateCategory = async () => {
     try {
       if (!newCategoryName.trim()) {
-        alert('El nombre de la categoría es requerido');
+        showError('El nombre de la categoría es requerido');
         return;
       }
 
@@ -360,7 +382,7 @@ export default function AdminPage() {
   const handleUpdateCategory = async () => {
     try {
       if (!editingCategory || !newCategoryName.trim()) {
-        alert('Nombre de categoría requerido');
+        showError('Nombre de categoría requerido');
         return;
       }
 
@@ -459,7 +481,7 @@ export default function AdminPage() {
   const handleConfirmMoveProduct = async () => {
     try {
       if (!productToMove || !targetCategory) {
-        alert('Selecciona una categoría destino');
+        showError('Selecciona una categoría destino');
         return;
       }
 
@@ -484,7 +506,7 @@ export default function AdminPage() {
       fetchProducts();
       fetchCategories();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error desconocido');
+      showError(err instanceof Error ? err.message : 'Error desconocido');
     }
   };
 
@@ -554,7 +576,7 @@ export default function AdminPage() {
       setShowConfirmModal(false);
       setProductToToggle(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error desconocido');
+      showError(err instanceof Error ? err.message : 'Error desconocido');
       setShowConfirmModal(false);
       setProductToToggle(null);
     }
@@ -564,13 +586,25 @@ export default function AdminPage() {
   const handleSaveUser = async () => {
     try {
       const { username, name, password, role } = userForm;
-      if (!username.trim() || !name.trim() || (!editingUser && !password) || !role) {
-        alert('Todos los campos son requeridos');
+      
+      // Validaciones básicas
+      if (!username?.trim()) {
+        showError('El nombre de usuario es requerido');
+        return;
+      }
+
+      if (!editingUser && !password) {
+        showError('La contraseña es requerida para usuarios nuevos');
         return;
       }
 
       if (!editingUser && password.length < 6) {
-        alert('La contraseña debe tener al menos 6 caracteres');
+        showError('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+
+      if (password && password.length < 6) {
+        showError('La contraseña debe tener al menos 6 caracteres');
         return;
       }
 
@@ -579,11 +613,16 @@ export default function AdminPage() {
         ? { 
             userId: editingUser.id, 
             username: username.trim(), 
-            name: name.trim(), 
+            name: name?.trim() || null, 
             role,
             ...(password ? { password } : {})
           }
-        : { username: username.trim(), name: name.trim(), password, role };
+        : { 
+            username: username.trim(), 
+            name: name?.trim() || null, 
+            password, 
+            role 
+          };
 
       const response = await fetch('/api/admin/users', {
         method,
@@ -601,15 +640,15 @@ export default function AdminPage() {
       setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
       fetchUsers();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error desconocido');
+      showError(err instanceof Error ? err.message : 'Error desconocido');
     }
   };
 
   const handleEditUser = (user: User) => {
     setEditingUser(user);
     setUserForm({
-      username: user.username,
-      name: user.name,
+      username: user.username || '',
+      name: user.name || '',
       password: '',
       role: user.role
     });
@@ -623,7 +662,7 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          isActive: !user.isActive
+          active: !user.isActive // Cambiado de isActive a active para coincidir con el schema
         }),
       });
 
@@ -633,8 +672,54 @@ export default function AdminPage() {
       }
 
       fetchUsers();
+
+      // CRÍTICO: Forzar verificación inmediata de sesiones
+      broadcastSessionCheck();
+      
+      // Mostrar mensaje de éxito
+      const action = user.isActive ? 'desactivado' : 'activado';
+      showSuccess(`Usuario "${user.name || user.username}" ${action} exitosamente. ${user.isActive ? 'Su acceso ha sido revocado inmediatamente.' : 'Ahora puede acceder al sistema.'}`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error desconocido');
+      showError(err instanceof Error ? err.message : 'Error desconocido');
+    }
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setUserToDelete(user);
+    setShowDeleteUserModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userToDelete.id }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al eliminar usuario');
+      }
+
+      setShowDeleteUserModal(false);
+      setUserToDelete(null);
+      fetchUsers();
+      
+      // CRÍTICO: Forzar verificación inmediata de sesiones
+      broadcastSessionCheck();
+      
+      // Ajustar página si es necesario
+      const newTotalPages = Math.ceil((users.length - 1) / usersPerPage);
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      }
+
+      showSuccess(`Usuario "${userToDelete.name || userToDelete.username}" eliminado correctamente. Su acceso ha sido revocado inmediatamente y sus registros históricos se mantienen.`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Error desconocido');
     }
   };
 
@@ -653,7 +738,7 @@ export default function AdminPage() {
 
       fetchOrders();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error desconocido');
+      showError(err instanceof Error ? err.message : 'Error desconocido');
     }
   };
 
@@ -758,6 +843,22 @@ export default function AdminPage() {
                 🔄 Actualizar
               </button>
             )}
+            
+            {/* User Info */}
+            {currentUser && (
+              <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/10 border border-white/20">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-bold">
+                  {currentUser.username.charAt(0).toUpperCase()}
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-white">@{currentUser.username}</div>
+                  <div className={`text-xs px-2 py-0.5 rounded-full ${ROLE_COLORS[currentUser.role]}`}>
+                    {currentUser.role === 'ADMIN' ? '👑' : currentUser.role === 'CHEF' ? '👨‍🍳' : '💳'} {ROLE_LABELS[currentUser.role]}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <LogoutButton />
           </div>
         </div>
@@ -1276,96 +1377,252 @@ export default function AdminPage() {
 
         {/* Users Tab */}
         {activeTab === 'users' && (
-          <div className="space-y-6">
-            {/* Header with add button */}
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
-              <button
-                onClick={() => {
-                  setEditingUser(null);
-                  setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
-                  setShowUserForm(true);
-                }}
-                className="px-4 py-2 rounded-lg bg-[#8DFF50] text-[#1D263B] font-medium hover:bg-[#7DE040]"
-              >
-                ➕ Agregar Usuario
-              </button>
+          <div className="space-y-8">
+            {/* Header with stats and add button */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] bg-clip-text text-transparent">
+                  👥 Gestión de Usuarios
+                </h2>
+                <p className="text-white/60 text-lg">
+                  Administra usuarios, roles y permisos del sistema
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                {!usersLoading && (
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-[#8DFF50]">{users.length}</div>
+                      <div className="text-white/60">Total</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-400">{users.filter(u => u.isActive).length}</div>
+                      <div className="text-white/60">Activos</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-400">{users.filter(u => !u.isActive).length}</div>
+                      <div className="text-white/60">Inactivos</div>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setEditingUser(null);
+                    setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
+                    setShowUserForm(true);
+                  }}
+                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] font-bold hover:from-[#7DE040] hover:to-[#6DD030] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
+                >
+                  <span className="text-xl">👤</span>
+                  Agregar Usuario
+                </button>
+              </div>
             </div>
 
             {usersLoading && (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8DFF50] mx-auto"></div>
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
+                <p className="text-white/60 text-lg">Cargando usuarios...</p>
               </div>
             )}
 
             {usersError && (
-              <div className="rounded-2xl bg-red-500/20 border border-red-500/50 p-4 text-red-200">
-                {usersError}
+              <div className="rounded-2xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 p-6 text-red-200 flex items-center gap-4">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h3 className="font-bold mb-1">Error al cargar usuarios</h3>
+                  <p>{usersError}</p>
+                </div>
               </div>
             )}
 
             {!usersLoading && !usersError && (
-              <div className="space-y-4">
-                {users.map((user) => (
-                  <div key={user.id} className="rounded-2xl bg-white/10 p-6 border border-white/20">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-bold text-lg">{user.name}</h3>
-                          <div className={`px-2 py-1 rounded text-xs font-medium ${ROLE_COLORS[user.role]}`}>
-                            {ROLE_LABELS[user.role]}
+              <>
+                <div className="grid gap-6">
+                  {users.slice((currentPage - 1) * usersPerPage, currentPage * usersPerPage).map((user) => (
+                    <div key={user.id} className="group rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-8 border border-white/20 hover:border-[#8DFF50]/50 transition-all duration-300 hover:shadow-2xl hover:shadow-[#8DFF50]/10 hover:scale-[1.02]">
+                      <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
+                        {/* User Info */}
+                        <div className="flex-1 space-y-4">
+                          {/* Header with name and badges */}
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-bold text-xl">
+                                {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-xl text-white">{user.name || 'Sin nombre'}</h3>
+                                <p className="text-white/60">@{user.username}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2">
+                              <div className={`px-3 py-1.5 rounded-full text-sm font-semibold ${ROLE_COLORS[user.role]} shadow-lg`}>
+                                {user.role === 'ADMIN' ? '👑' : user.role === 'CHEF' ? '👨‍🍳' : '💳'} {ROLE_LABELS[user.role]}
+                              </div>
+                              <div className={`px-3 py-1.5 rounded-full text-sm font-semibold shadow-lg ${
+                                user.isActive 
+                                  ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              }`}>
+                                {user.isActive ? '✅ Activo' : '❌ Inactivo'}
+                              </div>
+                            </div>
                           </div>
-                          <div className={`px-2 py-1 rounded text-xs font-medium ${
-                            user.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {user.isActive ? 'Activo' : 'Inactivo'}
-                          </div>
-                        </div>
-                        
-                        <p className="text-white/60 mb-2">@{user.username}</p>
-                        
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="text-white/60">Total pedidos:</span>
-                            <div className="font-bold">{user.totalOrders}</div>
-                          </div>
-                          <div>
-                            <span className="text-white/60">Como cajero:</span>
-                            <div className="font-bold">{user.cashierOrders}</div>
-                          </div>
-                          <div>
-                            <span className="text-white/60">Como chef:</span>
-                            <div className="font-bold">{user.chefOrders}</div>
-                          </div>
-                        </div>
-                      </div>
+                          
+                          {/* Stats - Solo para no-admins */}
+                          {user.role !== 'ADMIN' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                    <span className="text-blue-400">📋</span>
+                                  </div>
+                                  <div>
+                                    <div className="text-2xl font-bold text-white">{user.totalOrders}</div>
+                                    <div className="text-white/60 text-sm">Total pedidos</div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <span className="text-emerald-400">💳</span>
+                                  </div>
+                                  <div>
+                                    <div className="text-2xl font-bold text-white">{user.cashierOrders}</div>
+                                    <div className="text-white/60 text-sm">Como cajero</div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                    <span className="text-orange-400">👨‍🍳</span>
+                                  </div>
+                                  <div>
+                                    <div className="text-2xl font-bold text-white">{user.chefOrders}</div>
+                                    <div className="text-white/60 text-sm">Como chef</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-                      <div className="flex gap-2 ml-4">
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="px-3 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 text-sm"
-                        >
-                          ✏️ Editar
-                        </button>
-                        <button
-                          onClick={() => handleToggleUser(user)}
-                          className={`px-3 py-2 rounded-lg text-white text-sm ${
-                            user.isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-                          }`}
-                        >
-                          {user.isActive ? '❌ Desactivar' : '✅ Activar'}
-                        </button>
+                          {/* Mensaje para admins en lugar de stats */}
+                          {user.role === 'ADMIN' && (
+                            <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl p-4 border border-purple-500/30">
+                              <div className="flex items-center gap-3">
+                                <span className="text-2xl">👑</span>
+                                <div>
+                                  <div className="font-semibold text-purple-200">Usuario Administrador</div>
+                                  <div className="text-purple-300/80 text-sm">Gestiona la aplicación y usuarios del sistema</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col gap-3 min-w-fit">
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
+                          >
+                            <span>✏️</span>
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleToggleUser(user)}
+                            className={`px-6 py-3 rounded-2xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2 ${
+                              user.isActive 
+                                ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white' 
+                                : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                            }`}
+                          >
+                            <span>{user.isActive ? '⏸️' : '✅'}</span>
+                            {user.isActive ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
+                          >
+                            <span>🗑️</span>
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
 
-                {users.length === 0 && !usersLoading && (
-                  <div className="text-center py-8 text-white/60">
-                    No se encontraron usuarios
+                {/* Paginación */}
+                {users.length > usersPerPage && (
+                  <div className="flex justify-center items-center gap-4 mt-8">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 rounded-2xl bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center gap-2"
+                    >
+                      <span>←</span>
+                      Anterior
+                    </button>
+                    
+                    <div className="flex items-center gap-2">
+                      {Array.from({ length: Math.ceil(users.length / usersPerPage) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-10 h-10 rounded-full font-medium transition-all duration-300 ${
+                            currentPage === page
+                              ? 'bg-[#8DFF50] text-[#1D263B]'
+                              : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(users.length / usersPerPage)))}
+                      disabled={currentPage === Math.ceil(users.length / usersPerPage)}
+                      className="px-4 py-2 rounded-2xl bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center gap-2"
+                    >
+                      Siguiente
+                      <span>→</span>
+                    </button>
                   </div>
                 )}
-              </div>
+
+                {/* Información de paginación */}
+                {users.length > 0 && (
+                  <div className="text-center text-white/60 text-sm">
+                    Mostrando {((currentPage - 1) * usersPerPage) + 1} - {Math.min(currentPage * usersPerPage, users.length)} de {users.length} usuarios
+                  </div>
+                )}
+
+                {/* Estado vacío */}
+                {users.length === 0 && !usersLoading && (
+                  <div className="text-center py-16">
+                    <div className="text-6xl mb-6">👤</div>
+                    <h3 className="text-2xl font-bold text-white mb-3">No hay usuarios registrados</h3>
+                    <p className="text-white/60 text-lg mb-8">Comienza agregando tu primer usuario al sistema</p>
+                    <button
+                      onClick={() => {
+                        setEditingUser(null);
+                        setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
+                        setShowUserForm(true);
+                      }}
+                      className="px-8 py-4 rounded-2xl bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] font-bold hover:from-[#7DE040] hover:to-[#6DD030] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      👤 Agregar Primer Usuario
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1388,7 +1645,6 @@ export default function AdminPage() {
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setShowProductForm(false);
-                setNewCategoryName('');
               }
             }}
             style={{ 
@@ -1440,33 +1696,6 @@ export default function AdminPage() {
                         <option key={cat.name} value={cat.name} className="bg-[#2A3441] text-white py-2">{cat.name}</option>
                       ))}
                     </select>
-                    
-                    <div className="flex gap-2 items-center">
-                      <div className="text-lg text-white/60">O crear nueva:</div>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        placeholder="Nueva categoría"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="flex-1 px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white text-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (newCategoryName.trim()) {
-                            setProductForm(prev => ({ ...prev, category: newCategoryName.trim() }));
-                            setNewCategoryName('');
-                          }
-                        }}
-                        disabled={!newCategoryName.trim()}
-                        className="px-6 py-3 rounded-2xl bg-blue-500 text-white hover:bg-blue-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Usar
-                      </button>
-                    </div>
                   </div>
                 </div>
                 
@@ -1766,6 +1995,96 @@ export default function AdminPage() {
                   className="flex-1 px-4 py-2 rounded-lg bg-[#8DFF50] text-[#1D263B] font-medium hover:bg-[#7DE040]"
                 >
                   Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete User Confirmation Modal */}
+        {showDeleteUserModal && userToDelete && (
+          <div 
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowDeleteUserModal(false);
+                setUserToDelete(null);
+              }
+            }}
+          >
+            <div 
+              className="bg-[#1D263B] rounded-3xl p-8 w-full max-w-lg border border-red-500/30"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="text-6xl mb-4">⚠️</div>
+                <h3 className="text-2xl font-bold mb-4 text-red-400">¿Eliminar Usuario?</h3>
+                
+                <div className="bg-white/5 rounded-2xl p-6 mb-6 border border-white/10">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-bold text-2xl">
+                      {(userToDelete.name || userToDelete.username || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-bold text-xl text-white">{userToDelete.name || 'Sin nombre'}</h4>
+                      <p className="text-white/60">@{userToDelete.username}</p>
+                      <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${ROLE_COLORS[userToDelete.role]}`}>
+                        {userToDelete.role === 'ADMIN' ? '👑' : userToDelete.role === 'CHEF' ? '👨‍🍳' : '💳'} {ROLE_LABELS[userToDelete.role]}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {userToDelete.role !== 'ADMIN' && (
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="bg-white/5 rounded-lg p-3 text-center">
+                        <div className="font-bold text-lg">{userToDelete.totalOrders}</div>
+                        <div className="text-white/60">Total pedidos</div>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-3 text-center">
+                        <div className="font-bold text-lg">{userToDelete.cashierOrders}</div>
+                        <div className="text-white/60">Como cajero</div>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-3 text-center">
+                        <div className="font-bold text-lg">{userToDelete.chefOrders}</div>
+                        <div className="text-white/60">Como chef</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-amber-500/20 border border-amber-500/30 rounded-2xl p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">💾</span>
+                    <div className="text-left">
+                      <h4 className="font-bold text-amber-200 mb-2">Registros Históricos</h4>
+                      <p className="text-amber-300/80 text-sm">
+                        Los pedidos y registros asociados a este usuario se mantendrán para auditoría. 
+                        Solo se eliminará el acceso al sistema.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-white/60 mb-6">
+                  Esta acción no se puede deshacer. El usuario será eliminado permanentemente.
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setShowDeleteUserModal(false);
+                    setUserToDelete(null);
+                  }}
+                  className="flex-1 px-6 py-3 rounded-2xl bg-gray-600 text-white hover:bg-gray-700 font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteUser}
+                  className="flex-1 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                  🗑️ Eliminar Usuario
                 </button>
               </div>
             </div>
@@ -2184,6 +2503,52 @@ export default function AdminPage() {
                   ¡Genial! 🚀
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Error */}
+        {showErrorModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-red-800">Error</h3>
+              </div>
+              <p className="text-gray-700 mb-6">{modalMessage}</p>
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="w-full bg-red-600 text-white py-2 px-4 rounded-xl hover:bg-red-700 transition-colors"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Éxito */}
+        {showSuccessMessageModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-green-800">Éxito</h3>
+              </div>
+              <p className="text-gray-700 mb-6">{modalMessage}</p>
+              <button
+                onClick={() => setShowSuccessMessageModal(false)}
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 transition-colors"
+              >
+                Aceptar
+              </button>
             </div>
           </div>
         )}
