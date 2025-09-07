@@ -93,10 +93,22 @@ export default function KitchenPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [processingOrder, setProcessingOrder] = React.useState<string | null>(null);
   const [confirmModal, setConfirmModal] = React.useState<{ show: boolean; orderId?: string; orderNumber?: number }>({ show: false });
+  
+  // Estado para modal de comentarios especiales
+  const [showCommentsModal, setShowCommentsModal] = React.useState(false);
+  const [selectedComment, setSelectedComment] = React.useState<{ text: string; productName: string; orderNumber: number } | null>(null);
 
   const loadOrders = React.useCallback(async () => {
+    setLoading(true); // Mostrar animación de carga
     try {
-      const response = await fetch('/api/orders/kitchen', { cache: 'no-store' });
+      const response = await fetch('/api/orders/kitchen', { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -107,6 +119,29 @@ export default function KitchenPage() {
       setError(err instanceof Error ? err.message : 'Error cargando pedidos');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Función para polling automático SIN mostrar loading
+  const loadOrdersSilent = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/orders/kitchen', { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data: KitchenOrder[] = await response.json();
+      setOrders(data);
+      setError(null);
+    } catch (err) {
+      // En polling silencioso no mostramos errores para no interrumpir
+      console.error('Error en polling automático:', err);
     }
   }, []);
 
@@ -132,22 +167,35 @@ export default function KitchenPage() {
         throw new Error(error.error || `HTTP ${response.status}`);
       }
 
-      // Recargar pedidos inmediatamente
-      await loadOrders();
+      // Recargar pedidos inmediatamente sin loading
+      await loadOrdersSilent();
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
       setProcessingOrder(null);
     }
-  }, [confirmModal, loadOrders]);
+  }, [confirmModal, loadOrdersSilent]);
+
+  // Función para mostrar comentarios en modal
+  const showComments = React.useCallback((text: string, productName: string, orderNumber: number) => {
+    setSelectedComment({ text, productName, orderNumber });
+    setShowCommentsModal(true);
+  }, []);
+
+  const closeCommentsModal = React.useCallback(() => {
+    setShowCommentsModal(false);
+    setSelectedComment(null);
+  }, []);
 
   React.useEffect(() => {
-    loadOrders();
+    loadOrders(); // Carga inicial CON loading
     
-    // Polling más frecuente para cocina - cada 10 segundos
-    const interval = setInterval(loadOrders, 10000);
+    // Polling automático cada 2 segundos SIN mostrar loading
+    const interval = setInterval(() => {
+      loadOrdersSilent(); // Actualización silenciosa
+    }, 2000);
     return () => clearInterval(interval);
-  }, [loadOrders]);
+  }, [loadOrders, loadOrdersSilent]);
 
   if (!currentUser) {
     return (
@@ -162,53 +210,53 @@ export default function KitchenPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1D263B] via-[#2A3441] to-[#1D263B]">
-      {/* Header minimalista optimizado para cocina - Responsive */}
+      {/* Header optimizado para tablets y cocina */}
       <header className="bg-gradient-to-r from-black/20 to-black/10 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-8xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl flex items-center justify-center">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl md:rounded-2xl flex items-center justify-center">
                 <Image 
                   src="/img/logo_viejas-ganas.png" 
                   alt="Viejas Ganas" 
                   width={24} 
                   height={24} 
-                  className="object-contain sm:w-7 sm:h-7"
+                  className="object-contain sm:w-7 sm:h-7 md:w-8 md:h-8"
                 />
               </div>
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-white">🍳 Cocina</h1>
-                <p className="text-[#8DFF50] text-xs sm:text-sm">{currentUser.username}</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-white">🍳 Cocina</h1>
+                <p className="text-[#8DFF50] text-xs sm:text-sm md:text-base">{currentUser.username}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
               {/* Contador de pedidos activos */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-2 sm:px-4 py-2 sm:py-3 border border-white/20">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl md:rounded-2xl px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 border border-white/20">
                 <div className="text-center">
-                  <div className="text-lg sm:text-2xl font-bold text-[#8DFF50]">{orders.length}</div>
-                  <div className="text-xs text-gray-400 hidden sm:block">Pedidos</div>
+                  <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-[#8DFF50]">{orders.length}</div>
+                  <div className="text-xs md:text-sm text-gray-400 hidden sm:block">Pedidos</div>
                 </div>
               </div>
 
-              {/* Botón actualizar manual - Responsive */}
+              {/* Botón actualizar manual - Optimizado para tablets */}
               <button
                 onClick={loadOrders}
                 disabled={loading}
-                className="px-2 sm:px-4 py-2 sm:py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all font-medium flex items-center gap-1 sm:gap-2 disabled:opacity-50"
+                className={`px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 bg-white/10 text-white rounded-xl md:rounded-2xl hover:bg-white/20 transition-all font-medium flex items-center gap-1 sm:gap-2 md:gap-3 disabled:opacity-50 text-sm md:text-base ${loading ? 'bg-[var(--brand)]/20 scale-95' : ''}`}
               >
-                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-4 h-4 md:w-5 md:h-5 transition-transform ${loading ? 'animate-spin text-[var(--brand)]' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span className="hidden sm:inline">{loading ? 'Cargando...' : 'Actualizar'}</span>
+                <span className={`hidden sm:inline transition-colors ${loading ? 'text-[var(--brand)]' : ''}`}>{loading ? 'Actualizando...' : 'Actualizar'}</span>
               </button>
 
-              {/* Botón volver - Responsive */}
+              {/* Botón volver - Optimizado para tablets */}
               <Link
                 href="/"
-                className="px-2 sm:px-4 py-2 sm:py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all font-medium flex items-center gap-1 sm:gap-2"
+                className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 bg-white/10 text-white rounded-xl md:rounded-2xl hover:bg-white/20 transition-all font-medium flex items-center gap-1 sm:gap-2 md:gap-3 text-sm md:text-base"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 <span className="hidden sm:inline">Volver</span>
@@ -218,8 +266,8 @@ export default function KitchenPage() {
         </div>
       </header>
 
-      {/* Contenido principal - Responsive */}
-      <div className="max-w-7xl mx-auto p-3 sm:p-6">
+      {/* Contenido principal - Optimizado para tablets */}
+      <div className="max-w-8xl mx-auto p-3 sm:p-4 md:p-6 lg:p-8">
         {loading ? (
           <div className="flex items-center justify-center h-64 sm:h-96">
             <div className="text-center">
@@ -255,46 +303,49 @@ export default function KitchenPage() {
             <p className="text-gray-500 text-sm mt-2">Los nuevos pedidos aparecerán automáticamente</p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 md:gap-5 lg:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {orders.map((order) => (
               <div 
                 key={order.id} 
-                className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl sm:rounded-3xl p-4 sm:p-6 hover:bg-white/15 transition-all shadow-lg flex flex-col h-[400px] sm:h-[450px]"
+                className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl md:rounded-2xl lg:rounded-3xl p-3 sm:p-4 md:p-5 lg:p-6 hover:bg-white/15 transition-all shadow-lg flex flex-col min-h-0"
               >
-                {/* Header del pedido - Información clave responsive - ALTURA FIJA */}
-                <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="text-2xl sm:text-4xl font-bold text-[#8DFF50]">#{order.number}</div>
-                    <div className="bg-orange-500/20 text-orange-400 px-2 sm:px-3 py-1 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold">
+                {/* Header del pedido - Información clave optimizada para tablets */}
+                <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#8DFF50]">#{order.number}</div>
+                    <div className="bg-orange-500/20 text-orange-400 px-2 md:px-3 py-1 md:py-2 rounded-lg md:rounded-xl text-xs md:text-sm font-bold">
                       B{order.beeperId}
                     </div>
                   </div>
-                  <div className="text-right text-xs text-gray-400">
-                    <div className="font-medium">{new Date(order.createdAt).toLocaleTimeString('es-PA', { 
+                  <div className="text-right text-xs md:text-sm text-gray-400">
+                    <div className="font-medium text-sm md:text-base">{new Date(order.createdAt).toLocaleTimeString('es-PA', { 
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}</div>
-                    <div className="text-xs hidden sm:block">{order.cashier.username}</div>
+                    <div className="text-xs md:text-sm hidden sm:block">{order.cashier.username}</div>
                   </div>
                 </div>
 
-                {/* Items del pedido - Vista compacta optimizada responsive - SCROLL DINÁMICO */}
-                <div className="flex-1 min-h-0 mb-3 sm:mb-4">
-                  <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 space-y-2 sm:space-y-3">
+                {/* Items del pedido - Vista optimizada para tablets */}
+                <div className="mb-2 sm:mb-3 md:mb-4">
+                  <div className="space-y-1 sm:space-y-2 md:space-y-3">
                     {order.items.map((item) => (
-                      <div key={item.id} className="bg-white/5 rounded-lg sm:rounded-xl p-2 sm:p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="text-white font-medium text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
-                              <span className="bg-[#8DFF50]/20 text-[#8DFF50] px-1.5 sm:px-2 py-1 rounded-md sm:rounded-lg text-xs font-bold min-w-[32px] sm:min-w-[40px] text-center flex-shrink-0">
-                                {item.qty}x
-                              </span>
-                              <span className="truncate text-xs sm:text-sm">{item.product?.name || item.customName}</span>
+                      <div key={item.id} className="bg-white/5 rounded-lg md:rounded-xl p-2 md:p-3">
+                        <div className="flex items-start gap-2 md:gap-3">
+                          <span className="bg-[#8DFF50]/20 text-[#8DFF50] px-1.5 md:px-2 py-0.5 md:py-1 rounded md:rounded-lg text-xs md:text-sm font-bold min-w-[28px] md:min-w-[36px] text-center flex-shrink-0">
+                            {item.qty}x
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white text-xs sm:text-sm md:text-base font-medium leading-tight">
+                              {item.product?.name || item.customName}
                             </div>
                             {item.notes && (
-                              <div className="text-xs text-yellow-400 mt-1 ml-8 sm:ml-12 bg-yellow-500/10 px-1.5 sm:px-2 py-1 rounded-md sm:rounded-lg">
+                              <button
+                                onClick={() => showComments(item.notes || '', item.product?.name || item.customName || '', order.number)}
+                                className="text-xs md:text-sm text-yellow-400 mt-0.5 md:mt-1 bg-yellow-500/10 px-1.5 md:px-2 py-0.5 md:py-1 rounded md:rounded-lg leading-tight hover:bg-yellow-500/20 transition-colors cursor-pointer w-full text-left"
+                              >
                                 📝 {item.notes}
-                              </div>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -303,48 +354,45 @@ export default function KitchenPage() {
                   </div>
                 </div>
 
-                {/* Notas especiales del pedido - ALTURA FIJA CONDICIONAL */}
-                <div className="flex-shrink-0 h-16 sm:h-20 mb-3 sm:mb-4">
-                  {order.notes ? (
-                    <div className="h-full p-2 sm:p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg sm:rounded-xl overflow-y-auto scrollbar-thin scrollbar-thumb-yellow-400/20">
-                      <div className="text-yellow-400 text-xs font-medium mb-1 flex items-center gap-1">
-                        ⚠️ Notas especiales:
-                      </div>
-                      <div className="text-white text-xs sm:text-sm font-medium">{order.notes}</div>
+                {/* Notas especiales del pedido - Optimizado para tablets */}
+                {order.notes && (
+                  <button
+                    onClick={() => showComments(order.notes || '', `Pedido #${order.number}`, order.number)}
+                    className="mb-2 sm:mb-3 md:mb-4 p-2 md:p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg md:rounded-xl hover:bg-yellow-500/20 transition-colors cursor-pointer w-full text-left"
+                  >
+                    <div className="text-yellow-400 text-xs md:text-sm font-medium mb-1 md:mb-2 flex items-center gap-1 md:gap-2">
+                      ⚠️ Notas especiales:
                     </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-gray-500 text-xs">
-                      Sin notas especiales
-                    </div>
-                  )}
-                </div>
+                    <div className="text-white text-xs md:text-sm font-medium leading-tight">{order.notes}</div>
+                  </button>
+                )}
 
-                {/* Footer con total y botón de acción - ALTURA FIJA EN LA PARTE INFERIOR */}
-                <div className="flex-shrink-0 pt-3 sm:pt-4 border-t border-white/20">
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <div className="text-white font-bold text-lg sm:text-xl">{fmt(order.total)}</div>
-                    <div className="text-xs text-gray-400 text-right hidden sm:block">
-                      <div>Total del pedido</div>
+                {/* Footer con total y botón de acción - Optimizado para tablets */}
+                <div className="mt-auto pt-2 sm:pt-3 md:pt-4 border-t border-white/20">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
+                    <div className="text-white font-bold text-base sm:text-lg md:text-xl">{fmt(order.total)}</div>
+                    <div className="text-xs md:text-sm text-gray-400 hidden sm:block">
+                      Total
                     </div>
                   </div>
                   
-                  {/* Botón principal de acción - SIEMPRE EN LA MISMA POSICIÓN */}
+                  {/* Botón principal de acción */}
                   <button
                     onClick={() => handleMarkReady(order.id, order.number)}
                     disabled={processingOrder === order.id}
-                    className="w-full py-3 sm:py-4 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] rounded-lg sm:rounded-xl hover:from-[#7DE040] hover:to-[#6DD030] transition-all font-bold text-base sm:text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                    className="w-full py-2.5 sm:py-3 md:py-4 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] rounded-lg md:rounded-xl hover:from-[#7DE040] hover:to-[#6DD030] transition-all font-bold text-sm sm:text-base md:text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                   >
                     {processingOrder === order.id ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-2 border-[#1D263B]/30 border-t-[#1D263B]"></div>
-                        <span className="text-sm sm:text-base">Procesando...</span>
+                      <div className="flex items-center justify-center gap-2 md:gap-3">
+                        <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 border-2 border-[#1D263B]/30 border-t-[#1D263B]"></div>
+                        <span className="text-xs sm:text-sm md:text-base">Procesando...</span>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center justify-center gap-1 sm:gap-2 md:gap-3">
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        <span className="text-sm sm:text-base">Marcar Listo</span>
+                        <span className="text-xs sm:text-sm md:text-base">Marcar Listo</span>
                       </div>
                     )}
                   </button>
@@ -362,6 +410,60 @@ export default function KitchenPage() {
         onConfirm={confirmMarkReady}
         onCancel={() => setConfirmModal({ show: false })}
       />
+
+      {/* Modal de comentarios especiales */}
+      {showCommentsModal && selectedComment && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
+          onClick={closeCommentsModal}
+        >
+          <div 
+            className="bg-[#2A3441] rounded-2xl border border-slate-600/30 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 sm:p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Comentarios Especiales</h3>
+                  <p className="text-sm text-slate-300 mt-1">
+                    {selectedComment.productName} • Pedido #{selectedComment.orderNumber}
+                  </p>
+                </div>
+                <button
+                  onClick={closeCommentsModal}
+                  className="w-8 h-8 rounded-lg bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 transition-colors flex items-center justify-center"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Contenido del comentario */}
+              <div className="mb-4 sm:mb-6">
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-yellow-400 text-lg">📝</span>
+                    <span className="text-yellow-400 font-semibold text-sm">Instrucciones para cocina:</span>
+                  </div>
+                  <p className="text-white text-base leading-relaxed font-medium">
+                    {selectedComment.text}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón */}
+              <div className="flex justify-end">
+                <button
+                  onClick={closeCommentsModal}
+                  className="px-6 py-3 bg-[var(--brand)] hover:bg-[var(--brand)]/90 text-[var(--ink)] rounded-xl font-bold transition-colors"
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Estilos adicionales para optimización y responsividad */}
       <style jsx global>{`

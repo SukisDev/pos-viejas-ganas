@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import LogoutButton from '../../components/LogoutButton';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -196,19 +197,55 @@ export default function AdminPage() {
     setShowSuccessMessageModal(true);
   };
 
-  // Fetch functions
+  // Fetch functions optimizadas para máxima velocidad
   const loadStats = React.useCallback(async () => {
     try {
       setDashboardLoading(true);
-      const response = await fetch('/api/admin/stats', { cache: 'no-store' });
+      setDashboardError(null);
+      
+      // Fetch con configuración optimizada para velocidad
+      const response = await fetch('/api/admin/stats', { 
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data: DashboardStats = await response.json();
+      
+      // Actualización inmediata sin delay
       setStats(data);
-      setDashboardError(null);
+      
     } catch (err) {
       setDashboardError(err instanceof Error ? err.message : 'Error cargando estadísticas');
     } finally {
       setDashboardLoading(false);
+    }
+  }, []);
+
+  // Función silenciosa para polling automático SIN mostrar loading - ultra optimizada
+  const loadStatsSilent = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/stats', { 
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: DashboardStats = await response.json();
+      
+      // Actualización silenciosa instantánea
+      setStats(data);
+      setDashboardError(null);
+      
+    } catch (err) {
+      // En polling silencioso no mostramos errores para no interrumpir
+      console.error('Error en polling automático de stats:', err);
     }
   }, []);
 
@@ -762,10 +799,11 @@ export default function AdminPage() {
 
   // Effects
   React.useEffect(() => {
-    loadStats();
-    const interval = setInterval(loadStats, 30000);
+    loadStats(); // Carga inicial CON loading
+    // Polling automático cada 30 segundos SIN mostrar loading
+    const interval = setInterval(loadStatsSilent, 30000);
     return () => clearInterval(interval);
-  }, [loadStats]);
+  }, [loadStats, loadStatsSilent]);
 
   React.useEffect(() => {
     if (activeTab === 'orders') {
@@ -817,6 +855,17 @@ export default function AdminPage() {
     };
   }, [showProductForm, showCategoryForm, showMoveProductModal, showUserForm, showConfirmModal, showDeleteCategoryModal, showSuccessModal, showDeleteProductModal, showProductCreatedModal]);
 
+  // Polling automático ultra rápido y silencioso para el dashboard
+  React.useEffect(() => {
+    if (activeTab !== 'dashboard') return;
+
+    const interval = setInterval(() => {
+      loadStatsSilent();
+    }, 15000); // Actualizar cada 15 segundos - más frecuente para datos en tiempo real
+
+    return () => clearInterval(interval);
+  }, [activeTab, loadStatsSilent]);
+
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString('es-PA', {
       timeZone: 'America/Panama',
@@ -828,82 +877,160 @@ export default function AdminPage() {
     });
   };
 
-  if (dashboardLoading && activeTab === 'dashboard') {
-    return (
-      <main className="min-h-[100svh] bg-[#1D263B] text-white p-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">👑 Panel Admin</h1>
-            <LogoutButton />
+  return (
+    <main className="min-h-[100svh] bg-gradient-to-br from-[#0A0E1A] via-[#1D263B] to-[#2A3441] text-white relative overflow-hidden">
+      {/* Fondo animado sutil */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#8DFF50]/5 via-transparent to-[#8DFF50]/10 animate-pulse"></div>
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#8DFF50]/10 via-transparent to-transparent"></div>
+      
+      {/* Header Ultra Moderno */}
+      <header className="relative z-10 bg-gradient-to-r from-black/40 via-black/20 to-black/40 backdrop-blur-2xl border-b border-white/10 shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/5 via-transparent to-[#8DFF50]/5"></div>
+        
+        <div className="relative max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            {/* Logo y título espectacular */}
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-3xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative w-16 h-16 bg-gradient-to-br from-[#8DFF50] to-[#7DE040] rounded-3xl flex items-center justify-center shadow-2xl transform group-hover:scale-105 transition-transform">
+                  <span className="text-3xl">👑</span>
+                </div>
+              </div>
+              
+              <div>
+                <h1 className="text-4xl font-black bg-gradient-to-r from-white via-[#8DFF50] to-white bg-clip-text text-transparent leading-tight">
+                  Panel Admin
+                </h1>
+                <div className="flex items-center gap-3 mt-1">
+                  <div className="w-2 h-2 bg-[#8DFF50] rounded-full animate-pulse"></div>
+                  <p className="text-lg font-semibold text-[#8DFF50]">Control Total del Sistema</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Controles premium */}
+            <div className="flex items-center gap-3">
+              {/* Botón regresar al menú principal */}
+              <Link 
+                href="/"
+                className="group relative px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-500/30 backdrop-blur-xl transition-all duration-300"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 to-blue-400/0 group-hover:from-blue-400/10 group-hover:to-blue-400/5 rounded-2xl transition-all duration-300"></div>
+                
+                <div className="relative flex items-center gap-3">
+                  <div className="w-5 h-5 transition-all duration-300 group-hover:-translate-x-1">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  </div>
+                  <span className="font-bold text-base">
+                    Menú Principal
+                  </span>
+                </div>
+              </Link>
+
+              {/* Botón actualizar súper premium */}
+              {activeTab === 'dashboard' && (
+                <button 
+                  onClick={loadStats}
+                  disabled={dashboardLoading}
+                  className={`group relative px-6 py-3 rounded-2xl bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 border border-white/20 backdrop-blur-xl transition-all duration-300 ${dashboardLoading ? 'from-[var(--brand)]/30 to-[var(--brand)]/20 scale-95 border-[var(--brand)]/50' : ''}`}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/0 to-[#8DFF50]/0 group-hover:from-[#8DFF50]/10 group-hover:to-[#8DFF50]/5 rounded-2xl transition-all duration-300"></div>
+                  
+                  <div className="relative flex items-center gap-3">
+                    <div className={`w-5 h-5 transition-all duration-300 ${dashboardLoading ? 'animate-spin text-[var(--brand)]' : 'group-hover:rotate-180'}`}>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </div>
+                    <span className={`font-bold text-base transition-colors duration-300 ${dashboardLoading ? 'text-[var(--brand)]' : ''}`}>
+                      {dashboardLoading ? 'Actualizando...' : 'Actualizar'}
+                    </span>
+                  </div>
+                </button>
+              )}
+              
+              {/* Perfil de usuario ultra premium */}
+              {currentUser && (
+                <div className="group relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/20 to-[#7DE040]/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
+                  <div className="relative flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-white/15 to-white/5 border border-white/20 backdrop-blur-2xl shadow-2xl">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50] to-[#7DE040] rounded-xl blur-sm"></div>
+                      <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-black text-lg shadow-lg">
+                        {currentUser.username.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="font-bold text-base text-white">@{currentUser.username}</div>
+                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-bold ${ROLE_COLORS[currentUser.role]} shadow-lg`}>
+                        <span className="text-sm">
+                          {currentUser.role === 'ADMIN' ? '👑' : currentUser.role === 'CHEF' ? '👨‍🍳' : '💳'}
+                        </span>
+                        {ROLE_LABELS[currentUser.role]}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Botón salir premium */}
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-red-600/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative">
+                  <LogoutButton />
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-2xl bg-white/10 p-6 animate-pulse h-32" />
+        </div>
+      </header>
+
+      {/* Navigation Tabs Ultra Premium */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-6">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent rounded-3xl blur-xl"></div>
+          
+          <div className="relative flex gap-2 p-2 bg-gradient-to-r from-black/30 via-black/20 to-black/30 rounded-2xl border border-white/10 backdrop-blur-xl shadow-2xl overflow-x-auto">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: '📊', gradient: 'from-blue-500 to-blue-600' },
+              { id: 'orders', label: 'Pedidos', icon: '📦', gradient: 'from-orange-500 to-orange-600' },
+              { id: 'products', label: 'Productos', icon: '🍔', gradient: 'from-yellow-500 to-yellow-600' },
+              { id: 'users', label: 'Usuarios', icon: '👥', gradient: 'from-purple-500 to-purple-600' },
+              { id: 'credits', label: 'Créditos', icon: '💳', gradient: 'from-green-500 to-green-600' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`group relative px-6 py-3 rounded-xl font-bold text-base transition-all duration-300 whitespace-nowrap ${
+                  activeTab === tab.id 
+                    ? 'bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] transform scale-105 shadow-2xl' 
+                    : 'bg-gradient-to-r from-white/10 to-white/5 text-white hover:from-white/20 hover:to-white/10 border border-white/10'
+                }`}
+              >
+                {activeTab === tab.id && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#8DFF50]/50 to-[#7DE040]/50 rounded-xl blur-xl"></div>
+                )}
+                
+                <div className="relative flex items-center gap-2">
+                  <span className={`text-xl transition-transform duration-300 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+                    {tab.icon}
+                  </span>
+                  <span className="hidden sm:inline font-black tracking-wide">
+                    {tab.label}
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
         </div>
-      </main>
-    );
-  }
+      </div>
 
-  return (
-    <main className="min-h-[100svh] bg-[#1D263B] text-white p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">👑 Panel Admin</h1>
-          <div className="flex items-center gap-4">
-            {activeTab === 'dashboard' && (
-              <button 
-                onClick={loadStats}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition"
-              >
-                🔄 Actualizar
-              </button>
-            )}
-            
-            {/* User Info */}
-            {currentUser && (
-              <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/10 border border-white/20">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-bold">
-                  {currentUser.username.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-white">@{currentUser.username}</div>
-                  <div className={`text-xs px-2 py-0.5 rounded-full ${ROLE_COLORS[currentUser.role]}`}>
-                    {currentUser.role === 'ADMIN' ? '👑' : currentUser.role === 'CHEF' ? '👨‍🍳' : '💳'} {ROLE_LABELS[currentUser.role]}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <LogoutButton />
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          {[
-            { id: 'dashboard', label: '📊 Dashboard' },
-            { id: 'orders', label: '📦 Pedidos' },
-            { id: 'products', label: '🍔 Productos' },
-            { id: 'users', label: '👥 Usuarios' },
-            { id: 'credits', label: '💳 Créditos' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
-                activeTab === tab.id 
-                  ? 'bg-[#8DFF50] text-[#1D263B]' 
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pb-6">
         {/* Dashboard Content */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
@@ -919,8 +1046,80 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* Loading state optimizado - solo para el contenido */}
+            {dashboardLoading && !stats && (
+              <div className="space-y-6">
+                {/* Overview Cards Loading */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20 animate-pulse">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 bg-white/20 rounded-lg"></div>
+                        <div className="h-4 bg-white/20 rounded w-24"></div>
+                      </div>
+                      <div className="h-8 bg-white/20 rounded w-16 mb-2"></div>
+                      <div className="h-3 bg-white/20 rounded w-20"></div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Charts Loading */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20 animate-pulse">
+                    <div className="h-6 bg-white/20 rounded w-48 mb-4"></div>
+                    <div className="space-y-3">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-white/20 rounded"></div>
+                            <div>
+                              <div className="h-4 bg-white/20 rounded w-32 mb-1"></div>
+                              <div className="h-3 bg-white/20 rounded w-20"></div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="h-4 bg-white/20 rounded w-12 mb-1"></div>
+                            <div className="h-3 bg-white/20 rounded w-16"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20 animate-pulse">
+                    <div className="h-6 bg-white/20 rounded w-40 mb-4"></div>
+                    <div className="space-y-4">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white/20 rounded-lg"></div>
+                            <div>
+                              <div className="h-4 bg-white/20 rounded w-28 mb-1"></div>
+                              <div className="h-3 bg-white/20 rounded w-20"></div>
+                            </div>
+                          </div>
+                          <div className="h-4 bg-white/20 rounded w-20"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido real cuando hay datos */}
             {stats && (
-              <>
+              <div className="relative">
+                {/* Indicador sutil de actualización cuando está cargando con datos existentes */}
+                {dashboardLoading && (
+                  <div className="absolute top-0 right-0 z-10 px-3 py-1 bg-[#8DFF50]/20 border border-[#8DFF50]/30 rounded-lg backdrop-blur-sm">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-3 h-3 border-2 border-[#8DFF50] border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[#8DFF50] font-medium">Actualizando...</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Overview Cards */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
@@ -1021,7 +1220,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -1192,7 +1391,7 @@ export default function AdminPage() {
                           } else {
                             showSuccessMessage(result.error || 'Error en limpieza', true);
                           }
-                        } catch (err) {
+                        } catch {
                           showSuccessMessage('Error en limpieza', true);
                         }
                       }}

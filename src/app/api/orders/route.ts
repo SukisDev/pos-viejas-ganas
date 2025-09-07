@@ -34,11 +34,13 @@ interface OrderItemRequest {
   customName?: string;
   qty: number;
   unitPrice?: number;
+  notes?: string;
 }
 
 interface CreateOrderRequest {
   items: OrderItemRequest[];
   beeperId: number;
+  notes?: string;
 }
 
 export async function POST(request: Request) {
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
 
   try {
     const body: CreateOrderRequest = await request.json();
-    const { items, beeperId } = body;
+    const { items, beeperId, notes } = body;
 
     // Validaciones
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -137,6 +139,7 @@ export async function POST(request: Request) {
           qty: item.qty,
           unitPrice,
           lineTotal,
+          notes: item.notes || null,
         });
       }
 
@@ -149,6 +152,7 @@ export async function POST(request: Request) {
           total,
           beeperId,
           cashierId: auth.userId,
+          notes: notes || null,
           items: {
             create: orderItemsData,
           },

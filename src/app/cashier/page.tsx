@@ -212,6 +212,7 @@ export default function CashierPage() {
   // Estados de pedidos listos con polling ultra rápido
   const [readyOrders, setReadyOrders] = React.useState<ReadyOrder[]>([]);
   const [deliveringOrder, setDeliveringOrder] = React.useState<string | null>(null);
+  const [deliveredOrderIds, setDeliveredOrderIds] = React.useState<Set<string>>(new Set());
 
   // Estados de orden
   const [isCreatingOrder, setIsCreatingOrder] = React.useState(false);
@@ -259,12 +260,26 @@ export default function CashierPage() {
       const response = await fetch('/api/orders/ready', { cache: 'no-store' });
       if (response.ok) {
         const orders: ReadyOrder[] = await response.json();
-        setReadyOrders(orders);
+        // Filtrar pedidos que ya fueron marcados como entregados localmente
+        const filteredOrders = orders.filter(order => !deliveredOrderIds.has(order.id));
+        setReadyOrders(filteredOrders);
+        
+        // Limpiar IDs de pedidos entregados que ya no están en el servidor
+        const serverOrderIds = new Set(orders.map(order => order.id));
+        setDeliveredOrderIds(prev => {
+          const updated = new Set(prev);
+          for (const deliveredId of prev) {
+            if (!serverOrderIds.has(deliveredId)) {
+              updated.delete(deliveredId);
+            }
+          }
+          return updated;
+        });
       }
     } catch (error) {
       console.error('Error cargando pedidos listos:', error);
     }
-  }, []);
+  }, [deliveredOrderIds]);
 
   React.useEffect(() => {
     loadReadyOrders();
@@ -970,6 +985,9 @@ export default function CashierPage() {
                               method: 'POST',
                             });
                             if (response.ok) {
+                              // Marcar como entregado localmente para evitar que reaparezca
+                              setDeliveredOrderIds(prev => new Set(prev).add(order.id));
+                              // También remover inmediatamente del estado local
                               setReadyOrders(prev => prev.filter(o => o.id !== order.id));
                             }
                           } catch (error) {
