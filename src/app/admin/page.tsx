@@ -130,6 +130,10 @@ export default function AdminPage() {
     date: ''
   });
   const [expandedOrderId, setExpandedOrderId] = React.useState<string | null>(null);
+  
+  // Pagination state for orders
+  const [currentOrdersPage, setCurrentOrdersPage] = React.useState(1);
+  const ordersPerPage = 6;
 
   // Products state
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -186,6 +190,12 @@ export default function AdminPage() {
   const [showErrorModal, setShowErrorModal] = React.useState(false);
   const [showSuccessMessageModal, setShowSuccessMessageModal] = React.useState(false);
   const [modalMessage, setModalMessage] = React.useState('');
+
+  // Calendar navigation state
+  const [calendarMonth, setCalendarMonth] = React.useState(() => new Date().getMonth());
+  const [calendarYear, setCalendarYear] = React.useState(() => new Date().getFullYear());
+  const [availableDates, setAvailableDates] = React.useState<string[]>([]);
+  const [calendarLoading, setCalendarLoading] = React.useState(false);
 
   // Utility functions for modal management
   const showError = (message: string) => {
@@ -797,6 +807,110 @@ export default function AdminPage() {
     }
   };
 
+  // Calendar and pagination functions
+  const navigateMonth = (direction: number) => {
+    setCalendarMonth(prevMonth => {
+      const newMonth = prevMonth + direction;
+      if (newMonth < 0) {
+        setCalendarYear(prevYear => prevYear - 1);
+        return 11;
+      } else if (newMonth > 11) {
+        setCalendarYear(prevYear => prevYear + 1);
+        return 0;
+      }
+      return newMonth;
+    });
+  };
+
+  const generateCalendarDays = () => {
+    const firstDay = new Date(calendarYear, calendarMonth, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    const days = [];
+    const current = new Date(startDate);
+    
+    for (let i = 0; i < 42; i++) {
+      const dateStr = current.toISOString().split('T')[0];
+      const isActive = current.getMonth() === calendarMonth;
+      const hasOrders = availableDates.includes(dateStr);
+      
+      days.push({
+        day: current.getDate(),
+        date: dateStr,
+        isActive,
+        hasOrders
+      });
+      
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return days;
+  };
+
+  const formatDateForApi = (date: string) => {
+    return date;
+  };
+
+  const handleDateSelect = (date: string) => {
+    setOrderFilters(prev => ({ ...prev, date: date }));
+  };
+
+  // Pagination functions
+  const getFilteredOrders = () => {
+    return orders.filter(order => {
+      if (orderFilters.status !== 'all' && order.status !== orderFilters.status) {
+        return false;
+      }
+      if (orderFilters.date) {
+        // Convertir la fecha del pedido a formato YYYY-MM-DD para comparar
+        const orderDate = new Date(order.businessDate).toISOString().split('T')[0];
+        if (orderDate !== orderFilters.date) {
+          return false;
+        }
+      }
+      return true;
+    });
+  };
+
+  const getCurrentPageOrders = () => {
+    const filtered = getFilteredOrders();
+    const startIndex = (currentOrdersPage - 1) * ordersPerPage;
+    const endIndex = startIndex + ordersPerPage;
+    return filtered.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(getFilteredOrders().length / ordersPerPage);
+  };
+
+  // Reset pagination when filters change
+  React.useEffect(() => {
+    setCurrentOrdersPage(1);
+  }, [orderFilters]);
+
+  // Load available dates for calendar
+  const fetchAvailableDates = React.useCallback(async () => {
+    try {
+      setCalendarLoading(true);
+      const response = await fetch('/api/admin/orders/dates');
+      if (!response.ok) {
+        throw new Error('Error al cargar fechas disponibles');
+      }
+      const data = await response.json();
+      setAvailableDates(data.dates || []);
+    } catch (error) {
+      console.error('Error loading available dates:', error);
+    } finally {
+      setCalendarLoading(false);
+    }
+  }, []);
+
+  // Load available dates when calendar changes
+  React.useEffect(() => {
+    fetchAvailableDates();
+  }, [calendarMonth, calendarYear, fetchAvailableDates]);
+
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
       const response = await fetch('/api/admin/orders', {
@@ -1194,96 +1308,271 @@ export default function AdminPage() {
 
         {/* Orders Tab */}
         {activeTab === 'orders' && (
-          <div className="space-y-8">
-            {/* Filtros */}
-            <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-6 border border-white/20">
-              <h3 className="text-xl font-bold mb-4 text-white">🔍 Filtros</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-white/80">Estado:</label>
-                  <select
-                    value={orderFilters.status}
-                    onChange={(e) => setOrderFilters(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors"
-                  >
-                    <option value="all" className="bg-[#2A3441] text-white">🌟 Todos los Estados</option>
-                    <option value="IN_KITCHEN" className="bg-[#2A3441] text-white">🍳 En Cocina</option>
-                    <option value="READY" className="bg-[#2A3441] text-white">✅ Listo</option>
-                    <option value="DELIVERED" className="bg-[#2A3441] text-white">🚚 Entregado</option>
-                    <option value="CANCELLED" className="bg-[#2A3441] text-white">❌ Cancelado</option>
-                  </select>
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Sidebar de Filtros - Responsivo */}
+            <div className="w-full lg:w-80 lg:flex-shrink-0">
+              <div className="lg:sticky lg:top-0 space-y-6">
+                {/* Filtros Principales */}
+                <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-4 lg:p-6 border border-white/20">
+                  <h3 className="text-lg lg:text-xl font-bold mb-4 text-white">🔍 Filtros</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-white/80">Estado:</label>
+                      <select
+                        value={orderFilters.status}
+                        onChange={(e) => setOrderFilters(prev => ({ ...prev, status: e.target.value }))}
+                        className="w-full px-3 lg:px-4 py-2 lg:py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors text-sm lg:text-base"
+                      >
+                        <option value="all" className="bg-[#2A3441] text-white">🌟 Todos</option>
+                        <option value="IN_KITCHEN" className="bg-[#2A3441] text-white">🍳 En Cocina</option>
+                        <option value="READY" className="bg-[#2A3441] text-white">✅ Listo</option>
+                        <option value="DELIVERED" className="bg-[#2A3441] text-white">🚚 Entregado</option>
+                        <option value="CANCELLED" className="bg-[#2A3441] text-white">❌ Cancelado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-white/80">📅 Fecha:</label>
+                      <input
+                        type="date"
+                        value={orderFilters.date}
+                        onChange={(e) => setOrderFilters(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full px-3 lg:px-4 py-2 lg:py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors [color-scheme:dark] text-sm lg:text-base"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setOrderFilters(prev => ({ ...prev, status: 'all', date: '' }))}
+                      className="w-full px-3 lg:px-4 py-2 lg:py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors text-sm lg:text-base"
+                    >
+                      🧹 Limpiar
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-white/80">📅 Fecha:</label>
-                  <input
-                    type="date"
-                    value={orderFilters.date}
-                    onChange={(e) => setOrderFilters(prev => ({ ...prev, date: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white focus:border-[#8DFF50] focus:outline-none transition-colors [color-scheme:dark]"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={() => setOrderFilters(prev => ({ ...prev, status: 'all', date: '' }))}
-                    className="w-full px-4 py-3 rounded-2xl bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors"
-                  >
-                    🧹 Limpiar Filtros
-                  </button>
+
+                {/* Calendario - Mejorado y Responsivo */}
+                <div className="rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-4 lg:p-6 border border-white/20">
+                  <h4 className="text-lg font-bold mb-4 text-white">📅 Navegación de Fechas</h4>
+                  
+                  {/* Navegación del mes */}
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      onClick={() => navigateMonth(-1)}
+                      className="p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      aria-label="Mes anterior"
+                    >
+                      ←
+                    </button>
+                    <span className="text-white font-medium text-center min-w-0 flex-1 px-2">
+                      {new Date(calendarYear, calendarMonth).toLocaleDateString('es-ES', { 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}
+                    </span>
+                    <button
+                      onClick={() => navigateMonth(1)}
+                      className="p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      aria-label="Mes siguiente"
+                    >
+                      →
+                    </button>
+                  </div>
+
+                  {/* Encabezados de días */}
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((day, index) => (
+                      <div key={index} className="text-center text-white/60 text-xs font-medium py-1">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Días del calendario */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {generateCalendarDays().map((day, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          if (day.isActive && day.hasOrders) {
+                            handleDateSelect(day.date);
+                          }
+                        }}
+                        disabled={!day.isActive || !day.hasOrders}
+                        className={`
+                          aspect-square text-xs rounded-lg transition-all duration-200 relative
+                          ${!day.isActive 
+                            ? 'text-white/30 cursor-not-allowed' 
+                            : day.hasOrders 
+                              ? orderFilters.date === day.date
+                                ? 'bg-[#8DFF50] text-[#1D263B] font-bold border-2 border-[#8DFF50]'
+                                : 'bg-[#8DFF50]/20 text-[#8DFF50] hover:bg-[#8DFF50]/30 cursor-pointer font-semibold border border-[#8DFF50]/30'
+                              : 'text-white/50 hover:bg-white/10 cursor-default'
+                          }
+                        `}
+                        title={day.hasOrders ? `${day.date} - Hay pedidos este día` : `${day.date} - Sin pedidos`}
+                      >
+                        {day.day}
+                        {day.hasOrders && day.isActive && (
+                          <div className="absolute top-0 right-0 w-2 h-2 bg-[#8DFF50] rounded-full transform translate-x-1 -translate-y-1"></div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Leyenda del calendario y estadísticas del día */}
+                  <div className="mt-4 pt-4 border-t border-white/20">
+                    {/* Estadísticas del día seleccionado */}
+                    {orderFilters.date && (
+                      <div className="mb-4 p-3 rounded-2xl bg-gradient-to-r from-[#8DFF50]/10 to-[#7DE040]/10 border border-[#8DFF50]/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">📅</span>
+                          <span className="text-white font-semibold text-sm">
+                            {new Date(orderFilters.date + 'T00:00:00').toLocaleDateString('es-ES', { 
+                              weekday: 'long', 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="bg-white/5 rounded-xl p-2">
+                            <div className="text-white/70">Pedidos:</div>
+                            <div className="text-[#8DFF50] font-bold">{getFilteredOrders().length}</div>
+                          </div>
+                          <div className="bg-white/5 rounded-xl p-2">
+                            <div className="text-white/70">Ingresos:</div>
+                            <div className="text-[#8DFF50] font-bold">
+                              {fmt(getFilteredOrders().reduce((sum, order) => sum + order.total, 0))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Leyenda del calendario */}
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-[#8DFF50]/20 border border-[#8DFF50]/30 rounded"></div>
+                        <span className="text-white/70">Días con pedidos</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-[#8DFF50] rounded"></div>
+                        <span className="text-white/70">Fecha seleccionada</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {calendarLoading && (
+                    <div className="mt-4 flex items-center justify-center">
+                      <div className="flex items-center gap-2 text-white/60 text-sm">
+                        <div className="w-4 h-4 border-2 border-[#8DFF50]/30 border-t-[#8DFF50] rounded-full animate-spin"></div>
+                        Cargando fechas...
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {ordersLoading && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
-                <p className="text-white/60 text-lg">Cargando pedidos...</p>
-              </div>
-            )}
-
-            {ordersError && (
-              <div className="rounded-3xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 p-6 text-red-200 flex items-center gap-4">
-                <span className="text-3xl">⚠️</span>
-                <div>
-                  <h3 className="font-bold mb-1">Error al cargar pedidos</h3>
-                  <p>{ordersError}</p>
+            {/* Panel Principal de Pedidos */}
+            <div className="flex-1 flex flex-col min-h-0">
+              {/* Resumen del día seleccionado */}
+              {orderFilters.date && !ordersLoading && !ordersError && (
+                <div className="mb-6 p-4 lg:p-6 rounded-3xl bg-gradient-to-r from-[#8DFF50]/10 via-[#7DE040]/10 to-[#8DFF50]/10 border border-[#8DFF50]/30">
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div>
+                      <h3 className="text-lg lg:text-xl font-bold text-white mb-1">
+                        📅 {new Date(orderFilters.date + 'T00:00:00').toLocaleDateString('es-ES', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </h3>
+                      <p className="text-white/70 text-sm">Resumen de ventas del día</p>
+                    </div>
+                    <div className="flex gap-4 lg:gap-6">
+                      <div className="text-center">
+                        <div className="text-2xl lg:text-3xl font-bold text-[#8DFF50]">
+                          {getFilteredOrders().length}
+                        </div>
+                        <div className="text-white/70 text-sm">Pedidos</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl lg:text-3xl font-bold text-[#8DFF50]">
+                          {fmt(getFilteredOrders().reduce((sum, order) => sum + order.total, 0))}
+                        </div>
+                        <div className="text-white/70 text-sm">Ingresos</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl lg:text-3xl font-bold text-[#8DFF50]">
+                          {getFilteredOrders().reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.qty, 0), 0)}
+                        </div>
+                        <div className="text-white/70 text-sm">Productos</div>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setOrderFilters(prev => ({ ...prev, date: '' }))}
+                    className="mt-4 px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors text-sm flex items-center gap-2"
+                  >
+                    <span>✕</span> Ver todos los días
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {!ordersLoading && !ordersError && (
-              <div className="space-y-4">
-                {orders.map((order) => {
+              {ordersLoading && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#8DFF50]/30 border-t-[#8DFF50] mb-4"></div>
+                  <p className="text-white/60 text-lg">Cargando pedidos...</p>
+                </div>
+              )}
+
+              {ordersError && (
+                <div className="rounded-3xl bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 p-6 text-red-200 flex items-center gap-4">
+                  <span className="text-3xl">⚠️</span>
+                  <div>
+                    <h3 className="font-bold mb-1">Error al cargar pedidos</h3>
+                    <p>{ordersError}</p>
+                  </div>
+                </div>
+              )}
+
+              {!ordersLoading && !ordersError && (
+                <>
+                  {/* Lista de Pedidos */}
+                  <div className="flex-1 space-y-4 min-h-0 overflow-y-auto">
+                    {getCurrentPageOrders().map((order) => {
                       const isExpanded = expandedOrderId === order.id;
                       return (
                         <div key={order.id} className="group rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 hover:border-[#8DFF50]/50 transition-all duration-300 overflow-hidden">
                           {/* Header del pedido (siempre visible) */}
                           <div 
-                            className="p-6 cursor-pointer hover:bg-white/5 transition-colors"
+                            className="p-4 lg:p-6 cursor-pointer hover:bg-white/5 transition-colors"
                             onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
                           >
                             <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
-                              <div className="flex items-center gap-4 flex-1">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center">
-                                  <span className="text-[#1D263B] font-bold text-lg">#{order.number}</span>
+                              <div className="flex items-center gap-4 flex-1 w-full">
+                                <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center flex-shrink-0">
+                                  <span className="text-[#1D263B] font-bold text-base lg:text-lg">#{order.number}</span>
                                 </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3 mb-1">
-                                    <h3 className="text-xl font-bold text-white">Pedido #{order.number}</h3>
-                                    <div className={`px-3 py-1 rounded-xl text-xs font-bold ${STATUS_COLORS[order.status] || 'bg-gray-500/20 text-gray-400'}`}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2 lg:gap-3 mb-1">
+                                    <h3 className="text-lg lg:text-xl font-bold text-white">Pedido #{order.number}</h3>
+                                    <div className={`px-2 lg:px-3 py-1 rounded-xl text-xs font-bold ${STATUS_COLORS[order.status] || 'bg-gray-500/20 text-gray-400'}`}>
                                       {STATUS_LABELS[order.status] || order.status}
                                     </div>
                                   </div>
                                   <p className="text-white/60 text-sm">📟 Beeper {order.beeperId} • ⏰ {formatDate(order.createdAt)}</p>
-                                  <div className="flex items-center gap-4 mt-2 text-sm">
+                                  <div className="flex flex-wrap items-center gap-2 lg:gap-4 mt-2 text-sm">
                                     <span className="text-white/60">💳 {order.cashier.name}</span>
                                     <span className="text-white/60">👨‍🍳 {order.chef ? order.chef.name : 'Sin asignar'}</span>
                                   </div>
                                 </div>
                               </div>
                               
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-4 flex-shrink-0">
                                 <div className="text-right">
-                                  <div className="text-2xl font-bold text-[#8DFF50]">{fmt(order.total)}</div>
+                                  <div className="text-xl lg:text-2xl font-bold text-[#8DFF50]">{fmt(order.total)}</div>
                                   <div className="text-white/60 text-sm">{order.items.length} productos</div>
                                 </div>
                                 <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
@@ -1297,7 +1586,7 @@ export default function AdminPage() {
 
                           {/* Contenido expandible */}
                           <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                            <div className="px-6 pb-6 border-t border-white/10">
+                            <div className="px-4 lg:px-6 pb-4 lg:pb-6 border-t border-white/10">
                               {/* Items del pedido */}
                               <div className="mt-6 mb-6">
                                 <h4 className="font-bold text-lg mb-4 text-white flex items-center gap-2">
@@ -1305,18 +1594,18 @@ export default function AdminPage() {
                                 </h4>
                                 <div className="grid gap-3">
                                   {order.items.map((item) => (
-                                    <div key={item.id} className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
-                                      <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-[#8DFF50]/20 flex items-center justify-center text-[#8DFF50] font-bold">
+                                    <div key={item.id} className="flex justify-between items-center bg-white/5 p-3 lg:p-4 rounded-2xl border border-white/10">
+                                      <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
+                                        <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-[#8DFF50]/20 flex items-center justify-center text-[#8DFF50] font-bold text-sm lg:text-base flex-shrink-0">
                                           {item.qty}
                                         </div>
-                                        <div>
-                                          <div className="font-semibold text-white">{item.product?.name || item.customName}</div>
-                                          <div className="text-white/60 text-sm">{fmt(item.unitPrice)} c/u</div>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-semibold text-white text-sm lg:text-base truncate">{item.product?.name || item.customName}</div>
+                                          <div className="text-white/60 text-xs lg:text-sm">{fmt(item.unitPrice)} c/u</div>
                                         </div>
                                       </div>
-                                      <div className="text-right">
-                                        <div className="font-bold text-lg text-white">{fmt(item.lineTotal)}</div>
+                                      <div className="text-right flex-shrink-0">
+                                        <div className="font-bold text-base lg:text-lg text-white">{fmt(item.lineTotal)}</div>
                                       </div>
                                     </div>
                                   ))}
@@ -1325,21 +1614,21 @@ export default function AdminPage() {
 
                               {/* Información adicional */}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                <div className="bg-white/5 rounded-2xl p-3 lg:p-4 border border-white/10">
                                   <div className="flex items-center gap-3">
-                                    <span className="text-xl">💳</span>
+                                    <span className="text-lg lg:text-xl">💳</span>
                                     <div>
                                       <div className="text-sm text-white/60">Cajero</div>
-                                      <div className="font-semibold text-white">{order.cashier.name}</div>
+                                      <div className="font-semibold text-white text-sm lg:text-base">{order.cashier.name}</div>
                                     </div>
                                   </div>
                                 </div>
-                                <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                                <div className="bg-white/5 rounded-2xl p-3 lg:p-4 border border-white/10">
                                   <div className="flex items-center gap-3">
-                                    <span className="text-xl">👨‍🍳</span>
+                                    <span className="text-lg lg:text-xl">👨‍🍳</span>
                                     <div>
                                       <div className="text-sm text-white/60">Chef</div>
-                                      <div className="font-semibold text-white">{order.chef ? order.chef.name : 'Sin asignar'}</div>
+                                      <div className="font-semibold text-white text-sm lg:text-base">{order.chef ? order.chef.name : 'Sin asignar'}</div>
                                     </div>
                                   </div>
                                 </div>
@@ -1347,14 +1636,14 @@ export default function AdminPage() {
 
                               {/* Acciones del pedido */}
                               {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
-                                <div className="flex flex-wrap gap-3 mb-4">
+                                <div className="flex flex-wrap gap-2 lg:gap-3 mb-4">
                                   {order.status === 'IN_KITCHEN' && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         updateOrderStatus(order.id, 'READY');
                                       }}
-                                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center gap-2 shadow-lg"
+                                      className="px-4 lg:px-6 py-2 lg:py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center gap-2 shadow-lg text-sm lg:text-base"
                                     >
                                       <span>✅</span> Marcar Listo
                                     </button>
@@ -1365,7 +1654,7 @@ export default function AdminPage() {
                                         e.stopPropagation();
                                         updateOrderStatus(order.id, 'DELIVERED');
                                       }}
-                                      className="px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center gap-2 shadow-lg"
+                                      className="px-4 lg:px-6 py-2 lg:py-3 rounded-2xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center gap-2 shadow-lg text-sm lg:text-base"
                                     >
                                       <span>🚚</span> Marcar Entregado
                                     </button>
@@ -1375,7 +1664,7 @@ export default function AdminPage() {
                                       e.stopPropagation();
                                       updateOrderStatus(order.id, 'CANCELLED');
                                     }}
-                                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-bold hover:from-red-600 hover:to-red-700 transition-all duration-200 flex items-center gap-2 shadow-lg"
+                                    className="px-4 lg:px-6 py-2 lg:py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-bold hover:from-red-600 hover:to-red-700 transition-all duration-200 flex items-center gap-2 shadow-lg text-sm lg:text-base"
                                   >
                                     <span>❌</span> Cancelar
                                   </button>
@@ -1384,8 +1673,8 @@ export default function AdminPage() {
 
                               {/* Información de entrega */}
                               {order.deliveredAt && (
-                                <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/30">
-                                  <p className="text-green-200 flex items-center gap-2">
+                                <div className="p-3 lg:p-4 rounded-2xl bg-green-500/10 border border-green-500/30">
+                                  <p className="text-green-200 flex items-center gap-2 text-sm lg:text-base">
                                     <span>🚚</span> Entregado: {formatDate(order.deliveredAt)}
                                   </p>
                                 </div>
@@ -1396,15 +1685,59 @@ export default function AdminPage() {
                       );
                     })}
 
-                    {orders.length === 0 && !ordersLoading && (
+                    {getCurrentPageOrders().length === 0 && !ordersLoading && (
                       <div className="text-center py-16">
-                        <div className="text-8xl mb-4">📋</div>
-                        <h3 className="text-2xl font-bold text-white mb-2">No hay pedidos</h3>
+                        <div className="text-6xl lg:text-8xl mb-4">📋</div>
+                        <h3 className="text-xl lg:text-2xl font-bold text-white mb-2">No hay pedidos</h3>
                         <p className="text-white/60">No se encontraron pedidos con los filtros seleccionados</p>
                       </div>
                     )}
-                </div>
+                  </div>
+
+                  {/* Paginación */}
+                  {getFilteredOrders().length > 0 && (
+                    <div className="mt-6 pt-4 lg:pt-6 border-t border-white/20">
+                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div className="text-white/60 text-sm order-2 sm:order-1">
+                          Mostrando {((currentOrdersPage - 1) * ordersPerPage) + 1} - {Math.min(currentOrdersPage * ordersPerPage, getFilteredOrders().length)} de {getFilteredOrders().length} pedidos
+                        </div>
+                        <div className="flex items-center gap-2 order-1 sm:order-2">
+                          <button
+                            onClick={() => setCurrentOrdersPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentOrdersPage === 1}
+                            className="px-3 lg:px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm lg:text-base"
+                          >
+                            ← Anterior
+                          </button>
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map(page => (
+                              <button
+                                key={page}
+                                onClick={() => setCurrentOrdersPage(page)}
+                                className={`px-2 lg:px-3 py-2 rounded-xl transition-colors text-sm lg:text-base ${
+                                  page === currentOrdersPage 
+                                    ? 'bg-[#8DFF50] text-[#1D263B] font-bold' 
+                                    : 'bg-white/10 text-white hover:bg-white/20'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => setCurrentOrdersPage(prev => Math.min(getTotalPages(), prev + 1))}
+                            disabled={currentOrdersPage === getTotalPages()}
+                            className="px-3 lg:px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm lg:text-base"
+                          >
+                            Siguiente →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
+            </div>
           </div>
         )}
 

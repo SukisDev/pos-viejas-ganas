@@ -101,9 +101,13 @@ export async function GET() {
 
     console.log('Final result:', finalResult);
 
+    // Para compatibilidad con el calendario, también devolvemos un array simple de fechas
+    const simpleDates = datesWithOrders.map(d => d.date);
+
     return NextResponse.json({ 
       success: true, 
-      monthsWithOrders: finalResult
+      monthsWithOrders: finalResult,
+      dates: simpleDates  // Array simple de fechas para el calendario
     });
 
   } catch (error) {
