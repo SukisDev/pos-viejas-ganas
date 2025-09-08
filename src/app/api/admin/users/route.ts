@@ -28,6 +28,7 @@ export async function GET() {
   if ('error' in auth) return auth.error;
 
   try {
+    // Obtener usuarios con campo email solo para administradores
     const users = await prisma.user.findMany({
       orderBy: [
         { role: 'asc' },
@@ -37,6 +38,7 @@ export async function GET() {
         id: true,
         username: true,
         name: true,
+        email: true,
         role: true,
         active: true,
         createdAt: true,
@@ -51,6 +53,8 @@ export async function GET() {
 
     const result = users.map(user => ({
       ...user,
+      // Solo mostrar email si el usuario es admin
+      email: user.role === 'ADMIN' ? user.email : null,
       totalOrders: user._count.ordersCreated + user._count.ordersCompleted,
       cashierOrders: user._count.ordersCreated,
       chefOrders: user._count.ordersCompleted,
@@ -70,9 +74,10 @@ export async function POST(request: Request) {
   if ('error' in auth) return auth.error;
 
   try {
-    const { username, name, password, role }: { 
+    const { username, name, email, password, role }: { 
       username: string; 
       name: string; 
+      email?: string;
       password: string; 
       role: string; 
     } = await request.json();
@@ -87,6 +92,29 @@ export async function POST(request: Request) {
 
     if (password.length < 6) {
       return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 });
+    }
+
+    // Validar email si se proporciona y el rol es ADMIN
+    if (email && email.trim()) {
+      if (role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Solo los administradores pueden tener email' }, { status: 400 });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return NextResponse.json({ error: 'El formato del email no es válido' }, { status: 400 });
+      }
+      
+      // Verificar que el email no esté en uso
+      const existingEmailUser = await prisma.user.findFirst({
+        where: {
+          email: email.trim().toLowerCase(),
+          NOT: { id: '' } // Para crear nuevos usuarios
+        }
+      });
+      
+      if (existingEmailUser) {
+        return NextResponse.json({ error: 'El email ya está en uso' }, { status: 409 });
+      }
     }
 
     const existingUser = await prisma.user.findFirst({
@@ -105,6 +133,7 @@ export async function POST(request: Request) {
       data: {
         username: username.toLowerCase().trim(),
         name: name.trim(),
+        email: (role === 'ADMIN' && email?.trim()) ? email.trim().toLowerCase() : null,
         passwordHash: hashedPassword,
         role: role as 'ADMIN' | 'CASHIER' | 'CHEF',
         active: true
@@ -113,6 +142,7 @@ export async function POST(request: Request) {
         id: true,
         username: true,
         name: true,
+        email: true,
         role: true,
         active: true,
         createdAt: true
@@ -121,6 +151,8 @@ export async function POST(request: Request) {
 
     const result = {
       ...user,
+      // Solo mostrar email si es admin
+      email: user.role === 'ADMIN' ? user.email : null,
       isActive: user.active
     };
 
@@ -140,10 +172,11 @@ export async function PATCH(request: Request) {
     const requestBody = await request.json();
     console.log('PATCH request body recibido:', requestBody);
     
-    const { userId, username, name, password, role, isActive }: {
+    const { userId, username, name, email, password, role, isActive }: {
       userId: string;
       username?: string;
       name?: string;
+      email?: string;
       password?: string;
       role?: string;
       isActive?: boolean;
@@ -155,7 +188,17 @@ export async function PATCH(request: Request) {
 
     const updateData: Record<string, string | boolean | null> = {};
     
-    console.log('Valores recibidos:', { userId, username, name, password, role, isActive });
+    console.log('Valores recibidos:', { userId, username, name, email, password, role, isActive });
+    
+    // Primero obtener el usuario actual para verificar su rol
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, email: true }
+    });
+    
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+    }
     
     if (username !== undefined) {
       const trimmedUsername = username?.trim();
@@ -165,6 +208,41 @@ export async function PATCH(request: Request) {
       updateData.username = trimmedUsername.toLowerCase();
     }
     if (name !== undefined) updateData.name = name?.trim() || null;
+    
+    // Manejar email solo para administradores
+    if (email !== undefined) {
+      const trimmedEmail = email?.trim();
+      const newRole = role || currentUser.role;
+      
+      if (trimmedEmail) {
+        // Solo admin puede tener email
+        if (newRole !== 'ADMIN') {
+          return NextResponse.json({ error: 'Solo los administradores pueden tener email' }, { status: 400 });
+        }
+        
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+          return NextResponse.json({ error: 'El formato del email no es válido' }, { status: 400 });
+        }
+        
+        // Verificar que el email no esté en uso por otro usuario
+        const existingEmailUser = await prisma.user.findFirst({
+          where: {
+            email: trimmedEmail.toLowerCase(),
+            NOT: { id: userId }
+          }
+        });
+        
+        if (existingEmailUser) {
+          return NextResponse.json({ error: 'El email ya está en uso' }, { status: 409 });
+        }
+        
+        updateData.email = trimmedEmail.toLowerCase();
+      } else {
+        updateData.email = null;
+      }
+    }
+    
     if (role !== undefined) {
       if (!['ADMIN', 'CASHIER', 'CHEF'].includes(role)) {
         return NextResponse.json({ error: 'Role inválido' }, { status: 400 });
@@ -188,7 +266,8 @@ export async function PATCH(request: Request) {
 
     // Verificar si existe el usuario
     const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      select: { id: true, username: true }
     });
 
     if (!existingUser) {
@@ -216,6 +295,7 @@ export async function PATCH(request: Request) {
         id: true,
         username: true,
         name: true,
+        email: true,
         role: true,
         active: true,
         createdAt: true
@@ -224,6 +304,8 @@ export async function PATCH(request: Request) {
 
     const result = {
       ...updatedUser,
+      // Solo mostrar email si es admin
+      email: updatedUser.role === 'ADMIN' ? updatedUser.email : null,
       isActive: updatedUser.active
     };
 

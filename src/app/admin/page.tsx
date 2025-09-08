@@ -76,6 +76,7 @@ interface User {
   id: string;
   username: string;
   name: string;
+  email?: string; // Campo opcional para email
   role: 'ADMIN' | 'CASHIER' | 'CHEF';
   isActive: boolean;
   createdAt: string;
@@ -182,6 +183,7 @@ export default function AdminPage() {
   const [userForm, setUserForm] = React.useState({
     username: '',
     name: '',
+    email: '',
     password: '',
     role: 'CASHIER'
   });
@@ -653,12 +655,37 @@ export default function AdminPage() {
   // User functions
   const handleSaveUser = async () => {
     try {
-      const { username, name, password, role } = userForm;
+      const { username, name, email, password, role } = userForm;
       
       // Validaciones básicas
       if (!username?.trim()) {
         showError('El nombre de usuario es requerido');
         return;
+      }
+
+      // Validar que el username no tenga espacios
+      if (username.includes(' ')) {
+        showError('El nombre de usuario no puede contener espacios');
+        return;
+      }
+
+      // Validar que el username solo tenga caracteres válidos
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        showError('El nombre de usuario solo puede contener letras, números, guiones y guiones bajos');
+        return;
+      }
+
+      // Validar email si se proporciona y es admin
+      if (email && email.trim()) {
+        if (role !== 'ADMIN') {
+          showError('Solo los administradores pueden tener email');
+          return;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+          showError('El formato del email no es válido');
+          return;
+        }
       }
 
       if (!editingUser && !password) {
@@ -681,13 +708,15 @@ export default function AdminPage() {
         ? { 
             userId: editingUser.id, 
             username: username.trim(), 
-            name: name?.trim() || null, 
+            name: name?.trim() || null,
+            email: email?.trim() || null,
             role,
             ...(password ? { password } : {})
           }
         : { 
             username: username.trim(), 
-            name: name?.trim() || null, 
+            name: name?.trim() || null,
+            email: email?.trim() || null,
             password, 
             role 
           };
@@ -705,7 +734,7 @@ export default function AdminPage() {
 
       setShowUserForm(false);
       setEditingUser(null);
-      setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
+      setUserForm({ username: '', name: '', email: '', password: '', role: 'CASHIER' });
       fetchUsers();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Error desconocido');
@@ -717,6 +746,7 @@ export default function AdminPage() {
     setUserForm({
       username: user.username || '',
       name: user.name || '',
+      email: user.email || '',
       password: '',
       role: user.role
     });
@@ -967,6 +997,13 @@ export default function AdminPage() {
     }
   }, [activeTab, fetchUsers]);
 
+  // Limpiar email cuando el rol no es ADMIN
+  React.useEffect(() => {
+    if (userForm.role !== 'ADMIN' && userForm.email) {
+      setUserForm(prev => ({ ...prev, email: '' }));
+    }
+  }, [userForm.role, userForm.email]);
+
   // Bloquear scroll cuando hay modales abiertos
   React.useEffect(() => {
     const hasModalOpen = showProductForm || showCategoryForm || showMoveProductModal || showUserForm || showConfirmModal || showDeleteCategoryModal || showSuccessModal || showDeleteProductModal || showProductCreatedModal;
@@ -1202,102 +1239,143 @@ export default function AdminPage() {
                 )}
 
                 {/* Overview Cards */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="text-2xl">📊</div>
-                      <div className="text-white/80">Total Pedidos</div>
+                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+                  {/* Total Pedidos - Hoy en grande */}
+                  <div className="rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl p-8 border border-white/20 hover:border-[#8DFF50]/30 transition-all duration-300 shadow-2xl">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center text-2xl border border-blue-500/30">
+                        📊
+                      </div>
+                      <div className="text-lg font-semibold text-white/90">Pedidos de Hoy</div>
                     </div>
-                    <div className="text-3xl font-bold text-[#8DFF50]">{stats.overview.totalOrders}</div>
-                    <div className="text-sm text-white/60 mt-1">Hoy: {stats.overview.todayOrders}</div>
+                    <div className="text-4xl font-black text-[#8DFF50] mb-3">{stats.overview.todayOrders}</div>
+                    <div className="text-sm text-white/60 bg-white/5 px-3 py-1 rounded-xl">
+                      Total: {stats.overview.totalOrders}
+                    </div>
                   </div>
 
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="text-2xl">💰</div>
-                      <div className="text-white/80">Ingresos Totales</div>
+                  {/* Ingresos Totales - Hoy en grande */}
+                  <div className="rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl p-8 border border-white/20 hover:border-[#8DFF50]/30 transition-all duration-300 shadow-2xl">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-600/20 flex items-center justify-center text-2xl border border-green-500/30">
+                        💰
+                      </div>
+                      <div className="text-lg font-semibold text-white/90">Ingresos de Hoy</div>
                     </div>
-                    <div className="text-3xl font-bold text-[#8DFF50]">{fmt(stats.overview.totalRevenue)}</div>
-                    <div className="text-sm text-white/60 mt-1">Hoy: {fmt(stats.overview.todayRevenue)}</div>
+                    <div className="text-4xl font-black text-[#8DFF50] mb-3">{fmt(stats.overview.todayRevenue)}</div>
+                    <div className="text-sm text-white/60 bg-white/5 px-3 py-1 rounded-xl">
+                      Total: {fmt(stats.overview.totalRevenue)}
+                    </div>
                   </div>
 
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="text-2xl">🍳</div>
-                      <div className="text-white/80">En Cocina</div>
+                  {/* En Cocina */}
+                  <div className="rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl p-8 border border-white/20 hover:border-yellow-400/30 transition-all duration-300 shadow-2xl">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center text-2xl border border-yellow-500/30">
+                        🍳
+                      </div>
+                      <div className="text-lg font-semibold text-white/90">En Cocina</div>
                     </div>
-                    <div className="text-3xl font-bold text-yellow-400">
+                    <div className="text-4xl font-black text-yellow-400 mb-3">
                       {stats.ordersByStatus.find(s => s.status === 'IN_KITCHEN')?.count || 0}
                     </div>
-                    <div className="text-sm text-white/60 mt-1">Activos</div>
+                    <div className="text-sm text-white/60 bg-white/5 px-3 py-1 rounded-xl">
+                      Activos ahora
+                    </div>
                   </div>
 
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="text-2xl">✅</div>
-                      <div className="text-white/80">Listos</div>
+                  {/* Listos */}
+                  <div className="rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl p-8 border border-white/20 hover:border-blue-400/30 transition-all duration-300 shadow-2xl">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center text-2xl border border-blue-500/30">
+                        ✅
+                      </div>
+                      <div className="text-lg font-semibold text-white/90">Listos</div>
                     </div>
-                    <div className="text-3xl font-bold text-blue-400">
+                    <div className="text-4xl font-black text-blue-400 mb-3">
                       {stats.ordersByStatus.find(s => s.status === 'READY')?.count || 0}
                     </div>
-                    <div className="text-sm text-white/60 mt-1">Para entregar</div>
+                    <div className="text-sm text-white/60 bg-white/5 px-3 py-1 rounded-xl">
+                      Para entregar
+                    </div>
                   </div>
                 </div>
 
                 {/* Charts Row */}
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid gap-8 lg:grid-cols-2 mt-8">
                   {/* Top Products */}
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                      🏆 Productos Más Vendidos (7 días)
-                    </h3>
-                    <div className="space-y-3">
+                  <div className="rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl p-8 border border-white/20 shadow-2xl">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center text-2xl border border-orange-500/30">
+                        🏆
+                      </div>
+                      <h3 className="text-2xl font-bold text-white/90">
+                        Productos Más Vendidos
+                      </h3>
+                    </div>
+                    <div className="space-y-4">
                       {stats.topProducts.map((product, index) => (
-                        <div key={product.productId} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl font-bold text-[#8DFF50]">#{index + 1}</div>
+                        <div key={product.productId} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-black text-lg">
+                              #{index + 1}
+                            </div>
                             <div>
-                              <div className="font-medium">{product.name}</div>
+                              <div className="font-semibold text-white text-lg">{product.name}</div>
                               <div className="text-sm text-white/60">{product.category}</div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-bold">{product.totalSold}</div>
+                            <div className="font-bold text-[#8DFF50] text-xl">{product.totalSold}</div>
                             <div className="text-sm text-white/60">vendidos</div>
                           </div>
                         </div>
                       ))}
                       {stats.topProducts.length === 0 && (
-                        <div className="text-center py-4 text-white/60">
-                          No hay datos de ventas aún
+                        <div className="text-center py-8 text-white/60">
+                          <div className="text-4xl mb-4">📈</div>
+                          <div className="text-lg">No hay datos de ventas aún</div>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Recent Orders */}
-                  <div className="rounded-2xl bg-white/10 backdrop-blur p-6 border border-white/20">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                      🕐 Pedidos Recientes
-                    </h3>
-                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                  <div className="rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl p-8 border border-white/20 shadow-2xl">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center text-2xl border border-purple-500/30">
+                        🕐
+                      </div>
+                      <h3 className="text-2xl font-bold text-white/90">
+                        Pedidos Recientes
+                      </h3>
+                    </div>
+                    <div className="space-y-4 max-h-80 overflow-y-auto">
                       {stats.recentOrders.map((order) => (
-                        <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-                          <div className="flex items-center gap-3">
-                            <div className="text-lg font-bold text-[#8DFF50]">#{order.number}</div>
+                        <div key={order.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8DFF50] to-[#7DE040] flex items-center justify-center text-[#1D263B] font-black text-sm">
+                              #{order.number}
+                            </div>
                             <div>
-                              <div className="font-medium">Beeper {order.beeperId}</div>
+                              <div className="font-semibold text-white text-lg">Beeper {order.beeperId}</div>
                               <div className="text-sm text-white/60">Por: {order.cashier.username}</div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-bold">{fmt(order.total)}</div>
-                            <div className={`text-xs px-2 py-1 rounded-lg ${STATUS_COLORS[order.status] || 'bg-gray-500/20 text-gray-400'}`}>
+                            <div className="font-bold text-[#8DFF50] text-xl mb-1">{fmt(order.total)}</div>
+                            <div className={`text-xs px-3 py-1 rounded-xl font-semibold ${STATUS_COLORS[order.status] || 'bg-gray-500/20 text-gray-400'}`}>
                               {STATUS_LABELS[order.status] || order.status}
                             </div>
                           </div>
                         </div>
                       ))}
+                      {stats.recentOrders.length === 0 && (
+                        <div className="text-center py-8 text-white/60">
+                          <div className="text-4xl mb-4">📋</div>
+                          <div className="text-lg">No hay pedidos recientes</div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1738,7 +1816,7 @@ export default function AdminPage() {
                 </>
               )}
             </div>
-          </div>
+            </div>
         )}
 
         {/* Products Tab */}
@@ -2016,7 +2094,7 @@ export default function AdminPage() {
                 <button
                   onClick={() => {
                     setEditingUser(null);
-                    setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
+                    setUserForm({ username: '', name: '', email: '', password: '', role: 'CASHIER' });
                     setShowUserForm(true);
                   }}
                   className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] font-bold hover:from-[#7DE040] hover:to-[#6DD030] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
@@ -2221,7 +2299,7 @@ export default function AdminPage() {
                     <button
                       onClick={() => {
                         setEditingUser(null);
-                        setUserForm({ username: '', name: '', password: '', role: 'CASHIER' });
+                        setUserForm({ username: '', name: '', email: '', password: '', role: 'CASHIER' });
                         setShowUserForm(true);
                       }}
                       className="px-8 py-4 rounded-2xl bg-gradient-to-r from-[#8DFF50] to-[#7DE040] text-[#1D263B] font-bold hover:from-[#7DE040] hover:to-[#6DD030] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -2540,10 +2618,17 @@ export default function AdminPage() {
                   <input
                     type="text"
                     value={userForm.username}
-                    onChange={(e) => setUserForm(prev => ({ ...prev, username: e.target.value }))}
+                    onChange={(e) => {
+                      // Remover espacios automáticamente y solo permitir caracteres válidos
+                      const value = e.target.value.replace(/\s/g, '').replace(/[^a-zA-Z0-9_-]/g, '');
+                      setUserForm(prev => ({ ...prev, username: value }));
+                    }}
                     className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white"
                     placeholder="usuario123"
                   />
+                  <div className="text-xs text-white/60 mt-1">
+                    Solo letras, números, guiones y guiones bajos. Sin espacios.
+                  </div>
                 </div>
                 
                 <div>
@@ -2555,6 +2640,28 @@ export default function AdminPage() {
                     className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white"
                     placeholder="Juan Pérez"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email (solo para administradores):</label>
+                  <input
+                    type="email"
+                    value={userForm.email}
+                    onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                    className={`w-full px-3 py-2 rounded-lg border text-white ${
+                      userForm.role === 'ADMIN' 
+                        ? 'bg-white/10 border-white/20' 
+                        : 'bg-gray-600 border-gray-500 cursor-not-allowed'
+                    }`}
+                    placeholder={userForm.role === 'ADMIN' ? "admin@ejemplo.com" : "Solo disponible para administradores"}
+                    disabled={userForm.role !== 'ADMIN'}
+                  />
+                  <div className="text-xs text-white/60 mt-1">
+                    {userForm.role === 'ADMIN' 
+                      ? 'Necesario para recuperación de contraseña por email' 
+                      : 'Solo los administradores pueden tener email para recuperar contraseña'
+                    }
+                  </div>
                 </div>
                 
                 <div>

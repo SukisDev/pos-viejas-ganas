@@ -6,14 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "create-dev-user": "node create-developer-user.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",
+    "@types/nodemailer": "^7.0.1",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",
     "jose": "^6.1.0",
+    "lucide-react": "^0.542.0",
     "next": "15.4.7",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.6",
     "prisma": "^6.14.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

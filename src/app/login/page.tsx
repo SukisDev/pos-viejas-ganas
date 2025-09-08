@@ -118,10 +118,23 @@ export default function LoginPage() {
                     autoComplete="username"
                     required
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => {
+                      // Remover espacios automáticamente del username
+                      const value = e.target.value.replace(/\s/g, '');
+                      setUsername(value);
+                    }}
+                    onKeyDown={(e) => {
+                      // Prevenir espacios en tiempo real
+                      if (e.key === ' ') {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8DFF50]/50 focus:border-[#8DFF50]/50 transition-all duration-200"
                     placeholder="Ingresa tu usuario"
                   />
+                  <p className="text-xs text-gray-400 mt-1 ml-10">
+                    Usuario sin espacios
+                  </p>
                 </div>
               </div>
 
@@ -208,6 +221,17 @@ export default function LoginPage() {
                   )}
                 </div>
               </button>
+              
+              {/* Enlace para recuperar contraseña */}
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => router.push('/forgot-password')}
+                  className="text-sm text-gray-400 hover:text-[#8DFF50] transition-colors duration-200"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
             </form>
           </div>
 
