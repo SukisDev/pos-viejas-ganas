@@ -14,17 +14,24 @@ export function useAuth() {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      // Simulación temporal para testing final del calendario
-      const mockUser: CurrentUser = {
-        id: 'mock-admin-id',
-        username: 'admin',
-        role: 'ADMIN'
-      };
-      setCurrentUser(mockUser);
-      setLoading(false);
-      return;
+      const response = await fetch('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser({
+          id: userData.id,
+          username: userData.username,
+          role: userData.role
+        });
+      } else {
+        setCurrentUser(null);
+      }
     } catch (err) {
       console.error('Error fetching current user:', err);
+      setCurrentUser(null);
     } finally {
       setLoading(false);
     }

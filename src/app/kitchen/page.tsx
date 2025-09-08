@@ -251,6 +251,17 @@ export default function KitchenPage() {
                 <span className={`hidden sm:inline transition-colors ${loading ? 'text-[var(--brand)]' : ''}`}>{loading ? 'Actualizando...' : 'Actualizar'}</span>
               </button>
 
+              {/* Botón documentación - Optimizado para tablets */}
+              <Link
+                href="/help"
+                className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 bg-purple-600/20 text-purple-300 rounded-xl md:rounded-2xl hover:bg-purple-600/30 transition-all font-medium flex items-center gap-1 sm:gap-2 md:gap-3 text-sm md:text-base"
+              >
+                <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span className="hidden sm:inline">📚 Manual</span>
+              </Link>
+
               {/* Botón volver - Optimizado para tablets */}
               <Link
                 href="/"

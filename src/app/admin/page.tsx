@@ -1085,6 +1085,23 @@ export default function AdminPage() {
                 </div>
               </Link>
 
+              {/* Botón Documentación */}
+              <Link 
+                href="/help"
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-500/20 to-purple-600/20 hover:from-purple-500/30 hover:to-purple-600/30 border border-purple-500/30 backdrop-blur-xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <span className="font-bold text-base">
+                    📚 Manual
+                  </span>
+                </div>
+              </Link>
+
               {/* Botón actualizar optimizado */}
               {activeTab === 'dashboard' && (
                 <button 

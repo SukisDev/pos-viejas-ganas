@@ -575,6 +575,14 @@ export default function CashierPage() {
               </button>
               
               <Link 
+                href="/help"
+                className="px-3 sm:px-4 py-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded-xl font-medium transition-all flex items-center gap-1 sm:gap-2"
+              >
+                <span>📚</span>
+                <span className="hidden sm:inline">Manual</span>
+              </Link>
+              
+              <Link 
                 href="/"
                 className="px-3 sm:px-4 py-2 bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 rounded-xl font-medium transition-all flex items-center gap-1 sm:gap-2"
               >

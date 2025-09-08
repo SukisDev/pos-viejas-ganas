@@ -43,11 +43,6 @@ npm run create-dev-user
 npm run dev
 ```
 
-### Acceso al Sistema
-- **URL**: http://localhost:3000
-- **Usuario**: developer
-- **Contraseña**: dev123
-
 ## 📚 Documentación Completa
 
 ### 👤 **Para Usuarios**
