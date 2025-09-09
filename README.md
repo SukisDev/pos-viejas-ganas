@@ -154,7 +154,7 @@ vercel
 ## 📞 Soporte
 
 Para soporte técnico o consultas comerciales:
-- 📧 Email: [tu-email@dominio.com]
+- 📧 Email: jean.gomez@sukidev.pro
 - 🐛 Reporta bugs en GitHub Issues
 
 ## 📄 Licencia
