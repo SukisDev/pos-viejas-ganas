@@ -55,17 +55,6 @@ npm run dev
 
 ## � Configuración
 
-### Variables de Entorno (.env)
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/pos_viejas_ganas"
-NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_USER="your-email@gmail.com"
-SMTP_PASS="your-app-password"
-```
-
 ## � Roles de Usuario
 
 - **👨‍💼 ADMIN**: Acceso completo al sistema, gestión de usuarios, productos y estadísticas
