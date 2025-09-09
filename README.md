@@ -7,20 +7,31 @@ Sistema completo de punto de venta (POS) diseñado específicamente para restaur
 - 🍽️ **Gestión completa de menú y productos**
 - 💰 **Sistema de órdenes en tiempo real**
 - 👨‍🍳 **Panel de cocina con estados de preparación**
-- 👥 **Gestión de usuarios con diferentes roles**
+- 👥 **Gestión de usuarios con diferentes roles (Admin/Cashier/Chef)**
 - 📊 **Dashboard con estadísticas y métricas**
 - 📧 **Sistema de recuperación de contraseña por email**
 - 🔔 **Notificaciones en tiempo real**
 - 📱 **Diseño responsive (móvil, tablet, desktop)**
+- 📚 **Manual de usuario integrado**
+- 🔒 **Sistema de autenticación y autorización robusto**
 
-## 🚀 Inicio Rápido
+## 🚀 Tecnologías
+
+- **Frontend:** Next.js 14, React, TypeScript, TailwindCSS
+- **Backend:** Next.js API Routes, Prisma ORM
+- **Base de Datos:** PostgreSQL
+- **Autenticación:** JWT con cookies httpOnly
+- **Email:** Nodemailer con SMTP
+- **UI/UX:** Diseño moderno con glassmorphism
+
+## 🏗️ Instalación
 
 ### Prerequisitos
 - Node.js 18+
 - PostgreSQL 12+
-- npm o yarn
+- npm
 
-### Instalación
+### Setup
 ```bash
 # Clonar repositorio
 git clone https://github.com/SukisDev/pos-viejas-ganas.git
@@ -29,58 +40,52 @@ cd pos-viejas-ganas
 # Instalar dependencias
 npm install
 
-# Configurar base de datos (ver GUIA_ADMINISTRACION.md)
-# Configurar archivo .env
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus configuraciones
 
-# Inicializar base de datos
+# Configurar base de datos
 npx prisma generate
 npx prisma migrate dev
-
-# Crear usuario administrador
-npm run create-dev-user
+npx prisma db seed
 
 # Iniciar servidor de desarrollo
 npm run dev
 ```
 
-## 📚 Documentación Completa
+## � Configuración
 
-### 👤 **Para Usuarios**
-- 📋 [**GUIA_DE_USUARIO.md**](./GUIA_DE_USUARIO.md) - Guía completa de uso del sistema
-- ⚡ [**REFERENCIA_RAPIDA.md**](./REFERENCIA_RAPIDA.md) - Comandos y URLs esenciales
+### Variables de Entorno (.env)
+```env
+DATABASE_URL="postgresql://username:password@localhost:5432/pos_viejas_ganas"
+NEXTAUTH_SECRET="your-secret-key"
+NEXTAUTH_URL="http://localhost:3000"
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+```
 
-### 👨‍💻 **Para Administradores**
-- 🔧 [**GUIA_ADMINISTRACION.md**](./GUIA_ADMINISTRACION.md) - Configuración técnica y mantenimiento
-- 📧 [**EMAIL_SYSTEM_DOCS.md**](./EMAIL_SYSTEM_DOCS.md) - Sistema de emails y recuperación
-- 🔑 [**FORGOT_PASSWORD_IMPROVEMENTS.md**](./FORGOT_PASSWORD_IMPROVEMENTS.md) - Mejoras de seguridad
+## � Roles de Usuario
 
-## 🏗️ Arquitectura del Sistema
+- **👨‍💼 ADMIN**: Acceso completo al sistema, gestión de usuarios, productos y estadísticas
+- **💰 CASHIER**: Toma órdenes, gestiona ventas y entrega de órdenes
+- **👨‍🍳 CHEF**: Gestiona preparación de órdenes en cocina
 
-### 🎯 **Roles de Usuario**
-- **👨‍💼 ADMIN**: Acceso completo al sistema
-- **💰 CASHIER**: Toma órdenes y gestiona ventas
-- **👨‍🍳 KITCHEN**: Gestiona preparación de órdenes
+## 🔄 Flujo de Trabajo
 
-### 🔄 **Flujo de Trabajo**
-1. **Cajero** toma orden → 
-2. **Cocina** recibe notificación → 
-3. **Cocina** prepara y marca lista → 
+1. **Cajero** toma orden del cliente
+2. **Cocina** recibe notificación automática
+3. **Cocina** prepara y marca orden lista
 4. **Cajero** entrega al cliente
 
-### 🛠️ **Tecnologías**
-- **Frontend**: Next.js 15, React, TailwindCSS
-- **Backend**: Next.js API Routes, Prisma ORM
-- **Base de Datos**: PostgreSQL
-- **Autenticación**: JWT + Cookies HTTP-only
-- **Email**: Nodemailer (Gmail/SMTP/Ethereal)
-- **Real-time**: Server-Sent Events
-
-## 📱 Pantallas Principales
+##  Pantallas Principales
 
 ### 🏠 **Dashboard Admin**
 - Estadísticas de ventas en tiempo real
 - Métricas de rendimiento
 - Gestión de usuarios y productos
+- Calendario de órdenes con filtros
 
 ### 💰 **Panel de Cajero**
 - Menú interactivo con categorías
@@ -104,29 +109,38 @@ npm run start                  # Servidor de producción
 npx prisma studio             # Interfaz visual de BD
 npx prisma migrate dev        # Nuevas migraciones
 npx prisma generate           # Regenerar cliente
-
-# Utilidades
-npm run create-dev-user       # Crear usuario admin
+npx prisma db seed            # Sembrar datos iniciales
 ```
 
 ## 🛡️ Seguridad
 
 - 🔐 Autenticación JWT con cookies HTTP-only
 - 🔒 Contraseñas hasheadas con bcrypt (12 rounds)
-- 🚫 Protección contra ataques comunes
+- 🚫 Middleware de protección de rutas
 - 📧 Recuperación segura de contraseña
 - 👥 Sistema de roles y permisos
 
 ## 🌐 Despliegue
 
 El sistema está optimizado para despliegue en:
-- **Vercel** (recomendado)
+- **Vercel** (recomendado para Next.js)
+- **Netlify**
 - **Docker**
-- **VPS tradicional**
+- **VPS con PM2**
 
-Ver [GUIA_ADMINISTRACION.md](./GUIA_ADMINISTRACION.md) para instrucciones detalladas.
+### Despliegue en Vercel
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
 
-## 📊 Estado del Proyecto
+# Deploy
+vercel
+
+# Variables de entorno en Vercel dashboard
+# DATABASE_URL, NEXTAUTH_SECRET, SMTP_*, etc.
+```
+
+## � Funcionalidades
 
 - ✅ Sistema de autenticación completo
 - ✅ Gestión de usuarios con roles
@@ -136,27 +150,27 @@ Ver [GUIA_ADMINISTRACION.md](./GUIA_ADMINISTRACION.md) para instrucciones detall
 - ✅ Dashboard con estadísticas
 - ✅ Sistema de email para recuperación
 - ✅ Diseño responsive
-- ✅ Documentación completa
+- ✅ Manual de usuario integrado
+- ✅ Calendario de órdenes con filtros
 
-## 🤝 Contribuir
+## 🎯 Próximas Funcionalidades
 
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
+- 📱 Progressive Web App (PWA)
+- 🧾 Integración fiscal (SAT México)
+- 📊 Business Intelligence avanzado
+- 🔔 Notificaciones push
+- 💳 Integración con pasarelas de pago
+- 📦 Control de inventario
 
 ## 📞 Soporte
 
-- 📖 Revisa la documentación completa
+Para soporte técnico o consultas comerciales:
+- 📧 Email: [tu-email@dominio.com]
 - 🐛 Reporta bugs en GitHub Issues
-- 💡 Sugiere mejoras en Discussions
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
+Este proyecto es software propietario. Todos los derechos reservados.
 
 ---
 

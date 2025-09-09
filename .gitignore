@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+test-*.js
+test-*.mjs
+test-*.html
+debug-*.js
+*test.js
+*test.mjs
 
 # next.js
 /.next/
@@ -40,4 +46,29 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma generated files
 /src/generated/prisma
+
+# development tools
+setup-*.mjs
+create-*.mjs
+check-*.js
+final-*.js
+
+# documentation drafts
+*_draft.md
+*_temp.md
+REFERENCIA_*.md
+GUIA_*.md
+*_IMPROVEMENTS.md
+*_DOCS.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store

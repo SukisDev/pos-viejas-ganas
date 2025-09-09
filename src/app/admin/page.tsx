@@ -1,5 +1,6 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import Link from 'next/link';
 import LogoutButton from '../../components/LogoutButton';
@@ -115,7 +116,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function AdminPage() {
   const { currentUser, broadcastSessionCheck } = useAuth();
-  const [activeTab, setActiveTab] = React.useState<'dashboard' | 'orders' | 'products' | 'users' | 'credits'>('dashboard');
+  const [activeTab, setActiveTab] = React.useState<'dashboard' | 'orders' | 'products' | 'users' | 'credits' | 'analytics'>('dashboard');
   
   // Dashboard state
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
@@ -199,6 +200,15 @@ export default function AdminPage() {
   const [availableDates, setAvailableDates] = React.useState<string[]>([]);
   const [calendarLoading, setCalendarLoading] = React.useState(false);
 
+  // Analytics state
+  const [analyticsData, setAnalyticsData] = React.useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
+  const [analyticsError, setAnalyticsError] = React.useState<string | null>(null);
+  const [analyticsDateRange, setAnalyticsDateRange] = React.useState({
+    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días atrás
+    end: new Date().toISOString().split('T')[0] // hoy
+  });
+
   // Utility functions for modal management
   const showError = (message: string) => {
     setModalMessage(message);
@@ -281,6 +291,27 @@ export default function AdminPage() {
       setOrdersLoading(false);
     }
   }, [orderFilters]);
+
+  const fetchAnalytics = React.useCallback(async () => {
+    try {
+      setAnalyticsLoading(true);
+      setAnalyticsError(null);
+      
+      const params = new URLSearchParams();
+      params.append('start', analyticsDateRange.start);
+      params.append('end', analyticsDateRange.end);
+      
+      const response = await fetch(`/api/admin/analytics?${params}`);
+      if (!response.ok) throw new Error('Error al obtener analítica');
+      
+      const data = await response.json();
+      setAnalyticsData(data);
+    } catch (err) {
+      setAnalyticsError(err instanceof Error ? err.message : 'Error cargando analítica');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [analyticsDateRange]);
 
   const fetchProducts = React.useCallback(async () => {
     try {
@@ -878,10 +909,6 @@ export default function AdminPage() {
     return days;
   };
 
-  const formatDateForApi = (date: string) => {
-    return date;
-  };
-
   const handleDateSelect = (date: string) => {
     setOrderFilters(prev => ({ ...prev, date: date }));
   };
@@ -996,6 +1023,13 @@ export default function AdminPage() {
       fetchUsers();
     }
   }, [activeTab, fetchUsers]);
+
+  // Cargar analítica cuando se activa el tab de analytics
+  React.useEffect(() => {
+    if (activeTab === 'analytics') {
+      fetchAnalytics();
+    }
+  }, [activeTab, fetchAnalytics]);
 
   // Limpiar email cuando el rol no es ADMIN
   React.useEffect(() => {
@@ -1164,7 +1198,8 @@ export default function AdminPage() {
               { id: 'orders', label: 'Pedidos', icon: '📦', gradient: 'from-orange-500 to-orange-600' },
               { id: 'products', label: 'Productos', icon: '🍔', gradient: 'from-yellow-500 to-yellow-600' },
               { id: 'users', label: 'Usuarios', icon: '👥', gradient: 'from-purple-500 to-purple-600' },
-              { id: 'credits', label: 'Créditos', icon: '💳', gradient: 'from-green-500 to-green-600' }
+              { id: 'credits', label: 'Créditos', icon: '💳', gradient: 'from-green-500 to-green-600' },
+              { id: 'analytics', label: 'Analítica', icon: '📈', gradient: 'from-pink-500 to-pink-600' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -2338,6 +2373,245 @@ export default function AdminPage() {
             <div className="text-white/60">
               Esta sección estará disponible próximamente.
             </div>
+          </div>
+        )}
+
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            {/* Header con controles de fecha */}
+            <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">📈 Analítica Avanzada</h2>
+                  <p className="text-white/70">Análisis profundo del rendimiento del negocio</p>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-white/70 text-sm">Desde:</label>
+                    <input
+                      type="date"
+                      value={analyticsDateRange.start}
+                      onChange={(e) => setAnalyticsDateRange(prev => ({ ...prev, start: e.target.value }))}
+                      className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-white/70 text-sm">Hasta:</label>
+                    <input
+                      type="date"
+                      value={analyticsDateRange.end}
+                      onChange={(e) => setAnalyticsDateRange(prev => ({ ...prev, end: e.target.value }))}
+                      className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={fetchAnalytics}
+                    disabled={analyticsLoading}
+                    className="px-4 py-2 bg-gradient-to-r from-[var(--brand)] to-[var(--brand)]/80 text-black font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+                  >
+                    {analyticsLoading ? '⏳' : '🔄'} Actualizar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Loading State */}
+            {analyticsLoading && (
+              <div className="flex justify-center items-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-[var(--brand)]/30 border-t-[var(--brand)] mx-auto mb-4"></div>
+                  <p className="text-white/70">Calculando analítica avanzada...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Error State */}
+            {analyticsError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center">
+                <div className="text-4xl mb-2">⚠️</div>
+                <h3 className="font-bold mb-1">Error en Analítica</h3>
+                <p className="text-red-300">{analyticsError}</p>
+                <button
+                  onClick={fetchAnalytics}
+                  className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg transition-colors"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
+            {/* Analytics Content */}
+            {analyticsData && !analyticsLoading && (
+              <div className="space-y-6">
+                
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 rounded-xl p-6">
+                    <div className="text-blue-400 text-3xl mb-2">📊</div>
+                    <div className="text-2xl font-bold text-white">{analyticsData.summary.totalOrders.toLocaleString()}</div>
+                    <div className="text-blue-300 text-sm">Total Órdenes</div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 rounded-xl p-6">
+                    <div className="text-green-400 text-3xl mb-2">💰</div>
+                    <div className="text-2xl font-bold text-white">${analyticsData.summary.totalRevenue.toLocaleString()}</div>
+                    <div className="text-green-300 text-sm">Ingresos Totales</div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-xl p-6">
+                    <div className="text-purple-400 text-3xl mb-2">🧾</div>
+                    <div className="text-2xl font-bold text-white">${analyticsData.summary.avgOrderValue}</div>
+                    <div className="text-purple-300 text-sm">Ticket Promedio</div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 rounded-xl p-6">
+                    <div className="text-orange-400 text-3xl mb-2">⏱️</div>
+                    <div className="text-2xl font-bold text-white">{analyticsData.summary.avgPrepTime} min</div>
+                    <div className="text-orange-300 text-sm">Tiempo Promedio</div>
+                  </div>
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  
+                  {/* Sales Trend */}
+                  <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      📈 Tendencia de Ventas
+                    </h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {analyticsData.salesTrend.slice(-10).map((day: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                          <div className="text-white/90">{new Date(day.date).toLocaleDateString()}</div>
+                          <div className="text-right">
+                            <div className="text-white font-semibold">${day.revenue.toLocaleString()}</div>
+                            <div className="text-white/60 text-sm">{day.orders} órdenes</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Top Products */}
+                  <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                      🏆 Productos Top
+                    </h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {analyticsData.topProducts.slice(0, 8).map((product: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                          <div>
+                            <div className="text-white font-medium">{product.productName}</div>
+                            <div className="text-white/60 text-sm">{product.category}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[var(--brand)] font-semibold">${product._sum.lineTotal?.toLocaleString()}</div>
+                            <div className="text-white/60 text-sm">{product._sum.qty} vendidos</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Category Analysis */}
+                <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    🏷️ Análisis por Categorías
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {analyticsData.categoryAnalysis.map((category: any, index: number) => (
+                      <div key={index} className="bg-white/5 rounded-lg p-4">
+                        <div className="text-white font-semibold mb-2">{category.category}</div>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Ingresos:</span>
+                            <span className="text-[var(--brand)]">${category.revenue.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Cantidad:</span>
+                            <span className="text-white">{category.quantity}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Promedio:</span>
+                            <span className="text-white">${category.avgOrderValue}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* User Performance */}
+                <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    👥 Rendimiento por Usuario
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/20">
+                          <th className="text-left text-white/70 p-3">Usuario</th>
+                          <th className="text-right text-white/70 p-3">Órdenes</th>
+                          <th className="text-right text-white/70 p-3">Ingresos</th>
+                          <th className="text-right text-white/70 p-3">Promedio</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analyticsData.userPerformance.map((user: any, index: number) => (
+                          <tr key={index} className="border-b border-white/10">
+                            <td className="p-3">
+                              <div className="text-white font-medium">{user.name || user.username}</div>
+                              <div className="text-white/60 text-sm">{user.role}</div>
+                            </td>
+                            <td className="text-right text-white p-3">{user._count.id}</td>
+                            <td className="text-right text-[var(--brand)] p-3">${user._sum.total?.toLocaleString()}</td>
+                            <td className="text-right text-white p-3">${user.avgOrderValue}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Hourly Analysis */}
+                <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    🕐 Análisis por Hora
+                  </h3>
+                  <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                    {analyticsData.hourlyAnalysis.map((hour: any) => (
+                      <div key={hour.hour} className="bg-white/5 rounded-lg p-3 text-center">
+                        <div className="text-white/70 text-xs">{hour.hour}:00</div>
+                        <div className="text-[var(--brand)] text-sm font-semibold">{hour.orders}</div>
+                        <div className="text-white/60 text-xs">${hour.revenue.toFixed(0)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weekly Analysis */}
+                <div className="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-6">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    📅 Análisis Semanal
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                    {analyticsData.weekdayAnalysis.map((day: any) => (
+                      <div key={day.day} className="bg-white/5 rounded-lg p-4 text-center">
+                        <div className="text-white font-medium mb-2">{day.dayName}</div>
+                        <div className="text-[var(--brand)] text-lg font-bold">{day.orders}</div>
+                        <div className="text-white/70 text-sm">${day.revenue.toLocaleString()}</div>
+                        <div className="text-white/50 text-xs">Prom: ${day.avgOrderValue}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
           </div>
         )}
 

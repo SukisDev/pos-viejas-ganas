@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -236,5 +236,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
